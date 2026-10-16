@@ -1,0 +1,15 @@
+{
+  "name": "Myth Guard",
+  "short_name": "Myth Guard",
+  "description": "Join your Dungeon Master's table from your phone.",
+  "start_url": "/player.html",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#060916",
+  "theme_color": "#0b1024",
+  "icons": [
+    { "src": "/brand/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "/brand/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

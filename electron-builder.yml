@@ -1,0 +1,40 @@
+appId: com.mythguard.app
+productName: Myth Guard
+copyright: Copyright © 2026
+asar: true
+compression: maximum
+directories:
+  output: package-output-1.0.1
+win:
+  icon: public/brand/icon-512.png
+  target:
+    - target: portable
+      arch:
+        - x64
+  artifactName: ${productName}-${version}-${arch}-${target}.${ext}
+files:
+  - desktop/**
+  - package.json
+  - node_modules/@noble/hashes/**
+  - node_modules/ws/**
+  - public/brand/icon-512.png
+extraResources:
+  - from: dist
+    to: dist
+  - from: server
+    to: server
+  # The local server shares protocol, security, state and audio helpers with the browser bundle.
+  - from: src
+    to: src
+  - from: node_modules/@noble/hashes
+    to: node_modules/@noble/hashes
+  - from: node_modules/ws
+    to: node_modules/ws
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+portable:
+  artifactName: ${productName}-${version}-${arch}-portable.${ext}

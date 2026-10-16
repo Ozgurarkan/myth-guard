@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="theme-color" content="#0b1024" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <title>Myth Guard — Player</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="/brand/apple-touch-icon.png" />
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <style>
+    :root { color-scheme: dark; }
+    html, body, #root { margin: 0; height: 100%; background: #060916; overflow: hidden; }
+    .boot { min-height: 100%; box-sizing: border-box; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px; padding: 24px; text-align: center; color: #c6d0f2;
+      font: 18px/1.5 'Inter Variable', Inter, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+      background: radial-gradient(760px 480px at 12% -8%, rgb(106 79 214 / .22), transparent 70%), radial-gradient(640px 420px at 100% 0%, rgb(30 138 163 / .16), transparent 70%), linear-gradient(180deg, #0b1024, #060916); }
+    .boot p { margin: 0; max-width: 32ch; }
+    .boot button { min-height: 48px; padding: 0 28px; border: 1px solid #a58bff; border-radius: 6px; background: #121a35; color: #cbbcff; font-family: inherit; font-size: 16px; font-weight: 600; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+    .boot button:active { background: #243060; }
+    .boot button:focus-visible { outline: 2px solid #4fd8ee; outline-offset: 2px; }
+  </style>
+</head>
+<body>
+  <div id="root">
+    <div class="boot">
+      <p id="player-load-message" role="status">Unrolling the map…</p>
+      <button type="button" onclick="window.location.reload()">Reload player view</button>
+    </div>
+  </div>
+  <script type="module">
+    import('/src/playerMain.jsx').catch((error) => {
+      console.error('Player view failed to load:', error);
+      const message = document.getElementById('player-load-message');
+      if (message) message.textContent = 'The player view could not load. Reload this page; if it still fails, restart the server on the GM computer.';
+    });
+  </script>
+</body>
+</html>

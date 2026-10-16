@@ -1,0 +1,127 @@
+/* ════════════════════════════════════════════════════════════════════════════
+   Session plan: a full page of the GM's own writing, like a word processor.
+   Page list on the left, the sheet of paper in the middle. Loaded only when the planner opens.
+   ════════════════════════════════════════════════════════════════════════════ */
+.planner {
+  position: fixed; top: var(--header-h); bottom: var(--status-h); left: 0; right: 0; z-index: calc(var(--z-chrome) + 5);
+  display: grid; grid-template-columns: 280px minmax(0, 1fr); background: var(--surface-0);
+  background-image: var(--ambient);
+}
+
+/* ── Page list ────────────────────────────────────────────────────────────── */
+.planner__side { display: flex; flex-direction: column; gap: var(--space-3); min-height: 0; padding: var(--space-4) var(--space-3) var(--space-3); background: var(--surface-1); border-right: 1px solid var(--border); }
+.planner__side:not(.is-open) { display: none; }
+.planner:has(.planner__side:not(.is-open)) { grid-template-columns: minmax(0, 1fr); }
+.planner__side-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); }
+.planner__side-head h2 { font: var(--fw-bold) var(--fs-xl)/1.1 var(--font-display); letter-spacing: .02em; color: var(--text); }
+.planner__search { display: flex; align-items: center; gap: 8px; height: 38px; padding: 0 var(--space-3); border: 1px solid var(--border-control); border-radius: var(--radius-md); background: var(--surface-sunken); color: var(--text-3); }
+.planner__search:focus-within { border-color: var(--accent-2); box-shadow: var(--focus-ring); }
+.planner__search input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; color: var(--text); font: var(--fw-regular) var(--fs-md) var(--font-body); }
+.planner__pages { flex: 1; min-height: 0; margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 4px; overflow-y: auto; }
+.planner__page { width: 100%; display: flex; flex-direction: column; gap: 3px; padding: 9px 12px; border: 1px solid transparent; border-radius: var(--radius-md); background: transparent; color: var(--text-2); text-align: left; transition: background var(--dur-fast), border-color var(--dur-fast); }
+.planner__page strong { font: var(--fw-semibold) var(--fs-md)/1.25 var(--font-body); color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.planner__page span { font-size: var(--fs-xs); color: var(--text-3); }
+.planner__page:hover { background: var(--surface-2); }
+.planner__page.is-active { background: var(--accent-wash); border-color: var(--accent-lo); }
+.planner__page.is-active strong { color: var(--accent-hi); }
+.planner__none { padding: var(--space-3); color: var(--text-3); font-size: var(--fs-sm); }
+.planner__private { display: flex; align-items: center; gap: 6px; font-size: var(--fs-xs); color: var(--text-3); }
+.planner__private .icon { color: var(--accent); }
+
+/* ── Menus (New page, Export) ─────────────────────────────────────────────── */
+.planner-menu { position: relative; }
+.planner-menu > summary { list-style: none; cursor: pointer; }
+.planner-menu > summary::-webkit-details-marker { display: none; }
+.planner-menu__list { position: absolute; z-index: 5; top: calc(100% + 6px); min-width: 260px; display: flex; flex-direction: column; gap: 2px; padding: 6px; border: 1px solid var(--border-strong); border-radius: var(--radius-md); background: var(--glass-bg-strong); -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur); box-shadow: var(--highlight-inset), var(--shadow-3); }
+.planner-menu__list.is-left { left: 0; }
+.planner-menu__list.is-right { right: 0; }
+.planner-menu__list button { display: flex; flex-direction: column; gap: 2px; padding: 8px 12px; border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--text-2); text-align: left; }
+.planner-menu__list button strong { font: var(--fw-semibold) var(--fs-md) var(--font-body); color: var(--text); }
+.planner-menu__list button span { font-size: var(--fs-xs); color: var(--text-3); }
+.planner-menu__list button:hover, .planner-menu__list button:focus-visible { background: var(--accent-wash-strong); outline: none; }
+
+/* ── Main column ──────────────────────────────────────────────────────────── */
+.planner__main { position: relative; display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+.planner__bar { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-2) var(--space-4); border-bottom: 1px solid var(--border); background: var(--surface-1); }
+.planner__title { flex: 1; min-width: 0; height: 44px; padding: 0 var(--space-3); border: 1px solid transparent; border-radius: var(--radius-md); background: transparent; color: var(--text); font: var(--fw-bold) var(--fs-2xl)/1 var(--font-display); letter-spacing: .02em; }
+.planner__title:hover { background: var(--surface-2); }
+.planner__title:focus { outline: none; border-color: var(--accent-2); background: var(--surface-sunken); box-shadow: var(--focus-ring); }
+.planner__status { flex: none; min-width: 70px; text-align: right; font-size: var(--fs-sm); color: var(--text-3); }
+.planner__status.is-saved::before { content: '✓ '; color: var(--success); }
+.planner__status.is-error { color: var(--danger); font-weight: var(--fw-semibold); }
+.planner__loading { flex: 1; display: grid; place-items: center; color: var(--text-3); }
+.planner__foot { flex: none; padding: 6px var(--space-4); border-top: 1px solid var(--border); background: var(--surface-1); font-size: var(--fs-xs); color: var(--text-3); text-align: right; }
+.planner__print-title { display: none; }
+
+/* ── Formatting toolbar ───────────────────────────────────────────────────── */
+.planner-toolbar { flex: none; display: flex; flex-wrap: wrap; align-items: center; gap: 2px; padding: 6px var(--space-4); border-bottom: 1px solid var(--border); background: var(--surface-2); }
+.planner-toolbar__sep { width: 1px; height: 22px; margin: 0 6px; background: var(--border-strong); }
+.planner-tool { display: grid; place-items: center; min-width: 34px; height: 34px; padding: 0 6px; border: 1px solid transparent; border-radius: var(--radius-sm); background: transparent; color: var(--text-2); font: var(--fw-semibold) var(--fs-sm) var(--font-body); }
+.planner-tool:hover:not(:disabled) { background: var(--surface-3); color: var(--text); }
+.planner-tool.is-active { background: var(--accent-wash-strong); border-color: var(--accent-lo); color: var(--accent-hi); }
+.planner-tool:disabled { opacity: .4; cursor: not-allowed; }
+.planner-select { height: 34px; padding: 0 8px; border: 1px solid var(--border-control); border-radius: var(--radius-sm); background: var(--surface-sunken); color: var(--text); font: var(--fw-medium) var(--fs-sm) var(--font-body); }
+
+/* ── The sheet of paper ───────────────────────────────────────────────────── */
+.planner-sheet-wrap { flex: 1; min-height: 0; overflow-y: auto; padding: var(--space-6) var(--space-4) var(--space-12); }
+.planner-sheet { max-width: 820px; margin: 0 auto; min-height: 100%; padding: 56px clamp(24px, 6vw, 72px) 72px; border: 1px solid var(--border-strong); border-radius: var(--radius-md); background: var(--surface-2); box-shadow: var(--highlight-inset), var(--shadow-2); }
+.planner-prose { outline: none; min-height: 60vh; color: var(--text); font: var(--fw-regular) 17px/1.75 var(--font-body); caret-color: var(--accent-2); }
+.planner-prose > * + * { margin-top: .85em; }
+.planner-prose h1, .planner-prose h2, .planner-prose h3 { font-family: var(--font-display); font-weight: var(--fw-bold); line-height: 1.15; color: var(--text); letter-spacing: .01em; }
+.planner-prose h1 { font-size: 2.3rem; margin-top: 1.4em; }
+.planner-prose h2 { font-size: 1.75rem; margin-top: 1.4em; padding-bottom: .15em; border-bottom: 1px solid var(--border); color: var(--accent-hi); }
+.planner-prose h3 { font-size: 1.35rem; margin-top: 1.2em; }
+.planner-prose > :first-child { margin-top: 0; }
+.planner-prose a { color: var(--accent-2); text-decoration: underline; text-underline-offset: 3px; }
+.planner-prose mark { padding: 0 .15em; border-radius: 3px; background: rgb(255 193 90 / .38); color: var(--text); }
+.planner-prose ul, .planner-prose ol { padding-left: 1.5em; }
+.planner-prose li { margin: .2em 0; }
+.planner-prose li > p { margin: 0; }
+.planner-prose blockquote { margin: 1.1em 0; padding: .7em 1.1em; border-left: 4px solid var(--accent); border-radius: 0 var(--radius-md) var(--radius-md) 0; background: var(--accent-wash); font-style: italic; color: var(--text-2); }
+.planner-prose hr { border: 0; height: 1px; margin: 1.6em 0; background: linear-gradient(90deg, transparent, var(--accent-lo), transparent); }
+.planner-prose code { padding: .1em .35em; border-radius: 4px; background: var(--surface-sunken); font: .9em var(--font-mono); }
+.planner-prose pre { padding: .9em 1.1em; border-radius: var(--radius-md); background: var(--surface-sunken); overflow-x: auto; }
+.planner-prose pre code { padding: 0; background: none; }
+.planner-prose p.is-editor-empty:first-child::before { content: attr(data-placeholder); float: left; height: 0; color: var(--text-4); pointer-events: none; }
+.planner-prose ul[data-type='taskList'] { list-style: none; padding-left: 0; }
+.planner-prose ul[data-type='taskList'] li { display: flex; align-items: flex-start; gap: .6em; }
+.planner-prose ul[data-type='taskList'] li > label { flex: none; margin-top: .45em; user-select: none; }
+.planner-prose ul[data-type='taskList'] li > div { flex: 1; min-width: 0; }
+.planner-prose ul[data-type='taskList'] input[type='checkbox'] { width: 18px; height: 18px; accent-color: var(--accent); cursor: pointer; }
+.planner-prose ul[data-type='taskList'] li[data-checked='true'] > div { color: var(--text-3); text-decoration: line-through; }
+.planner-prose table { width: 100%; border-collapse: collapse; table-layout: fixed; margin: 1.1em 0; overflow: hidden; }
+.planner-prose th, .planner-prose td { position: relative; min-width: 60px; padding: 7px 10px; border: 1px solid var(--border-strong); vertical-align: top; text-align: left; }
+.planner-prose th { background: var(--surface-3); font-weight: var(--fw-semibold); }
+.planner-prose .selectedCell::after { content: ''; position: absolute; inset: 0; background: var(--accent-wash-strong); pointer-events: none; }
+.planner-prose .column-resize-handle { position: absolute; right: -2px; top: 0; bottom: 0; width: 4px; background: var(--accent); pointer-events: none; }
+.planner-prose .tableWrapper { overflow-x: auto; }
+.planner-prose ::selection { background: var(--accent-lo); color: var(--text); }
+
+/* ── Narrow windows ───────────────────────────────────────────────────────── */
+@media (max-width: 900px) {
+  .planner { grid-template-columns: minmax(0, 1fr); }
+  .planner__side.is-open { position: absolute; z-index: 6; top: 0; bottom: 0; left: 0; width: min(320px, 90vw); box-shadow: var(--shadow-3); }
+  .planner__bar { padding: var(--space-2); }
+  .planner__title { font-size: var(--fs-xl); }
+  .planner-sheet { padding: 28px 20px 48px; }
+}
+@media (max-width: 640px) { .planner__bar .btn__label { display: none; } }
+
+/* ── Printing: only the page, black on white ──────────────────────────────── */
+@media print {
+  html, body { height: auto !important; overflow: visible !important; background: #fff !important; }
+  body > *:not(.planner) { display: none !important; }
+  .planner { position: static; display: block; background: #fff; }
+  .planner__side, .planner__bar, .planner-toolbar, .planner__foot { display: none !important; }
+  .planner__main, .planner-sheet-wrap { display: block; overflow: visible; padding: 0; }
+  .planner__print-title { display: block; margin: 0 0 .6em; font: 700 2rem/1.2 Georgia, serif; color: #111; }
+  .planner-sheet { max-width: none; min-height: 0; padding: 0; border: 0; border-radius: 0; background: #fff; box-shadow: none; }
+  .planner-prose { color: #111; font: 12pt/1.6 Georgia, serif; min-height: 0; }
+  .planner-prose h1, .planner-prose h2, .planner-prose h3 { color: #111; border-color: #bbb; break-after: avoid; }
+  .planner-prose blockquote { background: #f2f0fa; border-left-color: #6a4fd6; color: #333; }
+  .planner-prose mark { background: #ffe58a; color: #111; }
+  .planner-prose th { background: #eee; }
+  .planner-prose th, .planner-prose td { border-color: #999; }
+  .planner-prose a { color: #1a4fb5; }
+  .planner-prose li, .planner-prose tr { break-inside: avoid; }
+}

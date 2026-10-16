@@ -1,0 +1,339 @@
+/* ════════════════════════════════════════════════════════════════════════════
+   Player screen — "moonlit spell-library", phone first (360-430px portrait and
+   landscape), equally at home on a tablet or a shared display.
+
+   Rules of the house
+   - Every control is >= 44px (--tap-min) on every pointer type; nothing needs hover.
+   - The map is the hero: the HUD floats over it as quiet glass. No backdrop-filter
+     here (it is expensive over a live canvas) — panels use near-opaque tints instead.
+   - Safe-area insets on every edge; dvh for height; no horizontal scroll.
+   - Motion is purposeful (turn change, reconnecting, loading) and collapses to
+     nothing under prefers-reduced-motion (tokens.css) — infinite loops are
+     opacity/transform only so they stay on the compositor.
+   Tokens: ./tokens.css  Shared parts (.btn .input .avatar .toast .modal): ./components.css
+   ════════════════════════════════════════════════════════════════════════════ */
+
+html, body, #root { overscroll-behavior: none; -webkit-text-size-adjust: 100%; }
+body { -webkit-tap-highlight-color: transparent; }
+.player-page, .gate, .waiting { height: 100vh; height: 100dvh; }
+
+/* Local keyframes (the shared ones live in gm.css, which the player bundle does not load) */
+@keyframes p-pulse { 50% { opacity: .45; } }
+@keyframes p-ring { 50% { opacity: .4; transform: scale(1.05); } }
+@keyframes p-float { 0%, 100% { transform: translateY(0) rotate(-6deg); } 50% { transform: translateY(-8px) rotate(10deg); } }
+@keyframes p-breathe { 0%, 100% { opacity: 1; } 50% { opacity: .72; } }
+@keyframes p-drop-in { from { opacity: 0; transform: translateY(-14px) scale(.96); } to { opacity: 1; transform: none; } }
+@keyframes p-rise-in { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: none; } }
+@keyframes p-fade { from { opacity: 0; } to { opacity: 1; } }
+
+/* ── Page shell ───────────────────────────────────────────────────────────── */
+.player-page {
+  position: relative; width: 100%; overflow: hidden;
+  background: radial-gradient(ellipse at 50% 40%, var(--surface-1), var(--surface-0) 75%);
+  /* The map handles its own pan/pinch, so the browser must not. Dialogs below opt back in. */
+  touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
+}
+.player-page input, .player-page textarea { user-select: text; -webkit-user-select: text; }  /* iOS refuses typing in user-select:none fields */
+.player-page .modal-overlay { touch-action: manipulation; }
+.player-page .modal__body { touch-action: pan-y; overscroll-behavior: contain; }
+.player-page .btn, .player-page button { touch-action: manipulation; }
+.p-map { position: absolute; inset: 0; touch-action: none; }
+.p-map canvas { display: block; outline: none; }
+
+/* Toasts sit just above the bottom HUD (thumb zone), never on top of the turn order.
+   The shared glass blur is dropped here: toasts float over a live canvas. */
+.player-page .toasts { top: auto; bottom: calc(92px + env(safe-area-inset-bottom, 0px)); width: min(calc(100vw - 24px), 460px); }
+.player-page .toast { -webkit-backdrop-filter: none; backdrop-filter: none; background: var(--surface-3); font-size: var(--fs-md); line-height: var(--lh-snug); }
+
+/* ── Top HUD ──────────────────────────────────────────────────────────────── */
+.p-top {
+  position: absolute; z-index: var(--z-overlay-ui); top: 0; left: 0; right: 0;
+  display: flex; flex-direction: column; align-items: center; gap: var(--space-2);
+  padding: calc(var(--space-2) + env(safe-area-inset-top, 0px)) calc(var(--space-2) + env(safe-area-inset-right, 0px)) 0 calc(var(--space-2) + env(safe-area-inset-left, 0px));
+  pointer-events: none;
+}
+.p-top > * { pointer-events: none; }
+.p-top__row { width: 100%; display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: start; gap: var(--space-2); }
+.p-top__row > * { pointer-events: auto; }
+.p-top__right {
+  grid-column: 3; justify-self: end; display: flex; align-items: center; gap: var(--space-2);
+  padding: 3px 3px 3px var(--space-3); border: 1px solid var(--glass-border); border-radius: var(--radius-full);
+  background: var(--glass-bg-strong); box-shadow: var(--highlight-inset), var(--shadow-2);
+}
+.p-top__right .btn { --btn-h: var(--tap-min); border-radius: 50%; }
+
+/* Connection state: a dot always, the words when something needs attention */
+.p-chip { position: relative; display: inline-flex; align-items: center; gap: 7px; font: var(--fw-semibold) var(--fs-sm)/1 var(--font-body); color: var(--text-2); white-space: nowrap; }
+.p-chip i { width: 9px; height: 9px; border-radius: 50%; background: var(--success); box-shadow: 0 0 8px var(--success-glow); }
+.p-chip.is-warn { color: var(--warning); }
+.p-chip.is-warn i { background: var(--warning); box-shadow: 0 0 8px var(--warning-glow); border-radius: 2px; transform: rotate(45deg); }   /* diamond: shape differs from the round "good" dot */
+.p-chip.is-bad { color: var(--danger); }
+.p-chip.is-bad i { background: var(--danger-solid); box-shadow: 0 0 8px var(--danger-glow); border-radius: 2px; animation: p-pulse 1.1s infinite; }  /* square + pulse */
+
+/* ── Initiative bar ───────────────────────────────────────────────────────── */
+.p-initiative {
+  --card-w: 62px;
+  grid-column: 2; justify-self: center; min-width: 0; max-width: 100%;
+  display: flex; align-items: center; gap: var(--space-2); padding: 6px 6px 6px 8px;
+  border: 1px solid var(--glass-border); border-radius: var(--radius-lg);
+  background: var(--glass-bg-strong); box-shadow: var(--highlight-inset), var(--shadow-2);
+}
+.p-initiative.is-collapsed { flex: 0 1 auto; padding: 4px 4px 4px 5px; border-radius: var(--radius-full); }
+.p-initiative > .btn { --btn-h: var(--tap-min); flex: none; border-radius: 50%; }
+.p-initiative__round {
+  flex: none; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  width: 54px; height: 54px; border-radius: 50%; line-height: 1;
+  background: radial-gradient(circle at 50% 28%, var(--accent), var(--accent-lo) 78%);
+  border: 1px solid var(--accent-hi); color: var(--text-on-accent); box-shadow: 0 0 14px var(--accent-wash-strong);
+}
+.p-initiative.is-collapsed .p-initiative__round { width: 52px; height: 52px; }
+.p-initiative__round span { font: var(--fw-bold) 9px/1 var(--font-body); letter-spacing: .06em; text-transform: uppercase; }
+.p-initiative__round strong { font: var(--fw-bold) 22px/1 var(--font-display); }
+.p-initiative.is-collapsed .p-initiative__round strong { font-size: 19px; }
+.p-initiative__now { display: flex; flex-direction: column; gap: 3px; padding-right: 2px; min-width: 0; }
+.p-initiative__now .eyebrow { color: var(--accent-2); }
+.p-initiative__now strong { font: var(--fw-semibold) var(--fs-base)/1.1 var(--font-body); max-width: 40vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.p-initiative__list {
+  flex: 1; min-width: 0; margin: 0; padding: 8px 10px 6px; list-style: none; display: flex; gap: var(--space-2);
+  overflow-x: auto; scrollbar-width: none; overscroll-behavior-x: contain; touch-action: pan-x;
+  /* fade the ends so it reads as scrollable */
+  -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 10px, #000 calc(100% - 14px), transparent 100%);
+  mask-image: linear-gradient(90deg, transparent 0, #000 10px, #000 calc(100% - 14px), transparent 100%);
+}
+.p-initiative__list::-webkit-scrollbar { display: none; }
+.p-initiative__list li { flex: 0 0 76px; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 4px 0 6px; border-radius: var(--radius-md); text-align: center; }
+.p-initiative__list li[aria-current='step'] { background: var(--accent-2-wash); }
+.p-initiative__name { max-width: 72px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: var(--fw-semibold) var(--fs-sm)/1.1 var(--font-body); color: var(--text); }
+.p-initiative__turn { padding: 2px 8px; border-radius: var(--radius-full); background: var(--accent-2); color: var(--text-on-accent); font: var(--fw-bold) 10px/1.3 var(--font-body); letter-spacing: var(--tracking-caps); text-transform: uppercase; }
+
+/* Vitals. Heroes: "12 / 20 HP" + a meter. Creatures: just their condition word. Colour is
+   reinforcement only — the words are always there. */
+.p-initiative__vitals { --tone: var(--text-2); --tone-fill: var(--success); display: flex; flex-direction: column; align-items: stretch; gap: 3px; max-width: 72px; }
+.p-initiative__health { padding: 1px 6px; border-radius: var(--radius-xs); background: var(--surface-sunken); font: var(--fw-semibold) var(--fs-xs)/1.25 var(--font-body); color: var(--tone); white-space: nowrap; text-align: center; }
+.p-initiative__hp { height: 4px; border-radius: var(--radius-full); background: var(--surface-sunken); border: 1px solid var(--border); overflow: hidden; }
+.p-initiative__hp i { display: block; width: 100%; height: 100%; background: var(--tone-fill); transform-origin: left; transform: scaleX(var(--hp, 1)); transition: transform var(--dur-slow) var(--ease-out); }
+.p-initiative__vitals.is-healthy { --tone: var(--success-hi); --tone-fill: var(--success); }
+.p-initiative__vitals.is-wounded { --tone: var(--warning-hi); --tone-fill: var(--warning-hi); }
+.p-initiative__vitals.is-badly-wounded { --tone: var(--warning); --tone-fill: var(--warning); }
+.p-initiative__vitals.is-almost-dead, .p-initiative__vitals.is-down { --tone: var(--danger); --tone-fill: var(--danger-solid); }
+.p-initiative__vitals.is-unknown { --tone: var(--text-3); }
+
+/* Portraits */
+.portrait {
+  position: relative; width: var(--card-w, 62px); height: calc(var(--card-w, 62px) * 1.16);
+  border: 3px solid var(--token-color, var(--border-strong)); border-radius: var(--radius-md) var(--radius-md) var(--radius-xl) var(--radius-xl);
+  background: var(--surface-2); box-shadow: var(--shadow-1), 0 0 10px color-mix(in srgb, var(--token-color, transparent) 45%, transparent);
+}
+.portrait img { width: 100%; height: 100%; object-fit: cover; object-position: center 25%; padding: 0; border-radius: 8px 8px 19px 19px; display: block; background: var(--surface-sunken); }
+.portrait__initial { display: grid; place-items: center; height: 100%; font: var(--fw-bold) 22px var(--font-display); color: var(--text-2); }
+.portrait__blood { position: absolute; inset: 0; border-radius: inherit; background: linear-gradient(to top, var(--danger-solid), rgb(216 64 95 / .5)); pointer-events: none; transition: opacity var(--dur-slow); }
+.portrait.is-down img { filter: grayscale(1) brightness(.5); }
+.portrait__skull { position: absolute; inset: 0; display: grid; place-items: center; color: var(--text); filter: drop-shadow(0 1px 3px #000); }
+.portrait__init { position: absolute; right: -8px; bottom: -6px; min-width: 26px; padding: 3px 4px; border: 1px solid var(--accent-lo); border-radius: 50%; background: var(--surface-1); color: var(--text); font: var(--fw-bold) var(--fs-xs) var(--font-body); text-align: center; }
+.portrait__you { position: absolute; left: -4px; top: -7px; padding: 1px 6px; border-radius: var(--radius-full); background: var(--accent); color: var(--text-on-accent); font: var(--fw-bold) 10px/1.3 var(--font-body); letter-spacing: var(--tracking-wide); }
+/* The turn ring pulses via opacity/scale on a pseudo-element (compositor only — a box-shadow animation repaints every frame). */
+.portrait.is-active::after { content: ''; position: absolute; inset: -6px; border-radius: 16px 16px 28px 28px; box-shadow: 0 0 0 2px var(--token-color, var(--accent-2)), 0 0 20px color-mix(in srgb, var(--token-color, var(--accent-2)) 70%, transparent), 0 0 38px color-mix(in srgb, var(--token-color, var(--accent-2)) 35%, transparent); pointer-events: none; animation: p-ring 1.8s ease-in-out infinite; }
+
+/* ── Banners ──────────────────────────────────────────────────────────────── */
+.p-turn, .p-banner { display: flex; align-items: center; gap: var(--space-3); max-width: min(520px, 100%); padding: 10px 18px; border-radius: var(--radius-full); pointer-events: none; box-shadow: var(--shadow-3); }
+.p-turn { border: 1px solid var(--accent-2); background: linear-gradient(180deg, var(--surface-4), var(--surface-2)); color: var(--accent-2); box-shadow: var(--shadow-3), var(--glow-accent-2); animation: p-drop-in var(--dur-slow) var(--ease-spring); }
+.p-turn div { display: flex; flex-direction: column; gap: 3px; }
+.p-turn .eyebrow { color: var(--accent-2-hi); }
+.p-turn strong { font: var(--fw-bold) var(--fs-xl)/1.1 var(--font-display); letter-spacing: .02em; color: var(--text); }
+.p-banner { border: 1px solid var(--border-strong); background: var(--glass-bg-strong); color: var(--text-2); font-size: var(--fs-md); line-height: var(--lh-snug); border-radius: var(--radius-lg); animation: p-drop-in var(--dur) var(--ease-out); }
+.p-banner.is-warn { border-color: var(--warning-lo); } .p-banner.is-warn .icon { color: var(--warning); }
+.p-banner.is-bad { border-color: var(--danger-lo); } .p-banner.is-bad .icon { color: var(--danger); }
+
+/* ── Menu ─────────────────────────────────────────────────────────────────── */
+.p-scrim { position: absolute; inset: 0; z-index: calc(var(--z-overlay-ui) - 1); padding: 0; border: 0; background: transparent; cursor: default; }
+.p-menu {
+  position: absolute; z-index: var(--z-chrome); top: calc(64px + env(safe-area-inset-top, 0px)); right: calc(var(--space-2) + env(safe-area-inset-right, 0px));
+  width: min(300px, calc(100vw - 16px)); max-height: calc(100dvh - 80px - env(safe-area-inset-top, 0px)); overflow-y: auto;
+  display: flex; flex-direction: column; padding: var(--space-2);
+  border: 1px solid var(--border-strong); border-radius: var(--radius-lg);
+  background: linear-gradient(180deg, var(--surface-3), var(--surface-1)); box-shadow: var(--highlight-inset), var(--shadow-3);
+  animation: p-fade var(--dur-fast) ease;
+}
+.p-menu::before { content: ''; position: absolute; left: 0; right: 0; top: 0; height: 2px; border-radius: var(--radius-lg) var(--radius-lg) 0 0; background: var(--rune-line); }
+.p-menu__who { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-2) var(--space-2) var(--space-3); margin-bottom: var(--space-1); border-bottom: 1px solid var(--border); }
+.p-menu__who div { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.p-menu__who strong { font: var(--fw-bold) var(--fs-lg)/1.1 var(--font-body); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.p-menu button { display: flex; align-items: center; gap: var(--space-3); min-height: 48px; padding: 0 var(--space-3); border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--text-2); font: var(--fw-semibold) var(--fs-base) var(--font-body); text-align: left; }
+.p-menu button:active { background: var(--accent-wash-strong); color: var(--accent-hi); }
+.p-menu button .icon { color: var(--accent); }
+.p-menu__note { padding: var(--space-2) var(--space-3) var(--space-1); font-size: var(--fs-sm); color: var(--text-3); }
+
+/* ── Bottom HUD (thumb zone) ──────────────────────────────────────────────── */
+.p-bottom {
+  position: absolute; z-index: var(--z-overlay-ui); left: 0; right: 0; bottom: 0;
+  display: grid; grid-template-columns: auto minmax(0, 1fr) auto; grid-template-areas: 'zoom left right'; align-items: end; gap: var(--space-2);
+  padding: 0 calc(10px + env(safe-area-inset-right, 0px)) calc(var(--space-3) + env(safe-area-inset-bottom, 0px)) calc(10px + env(safe-area-inset-left, 0px));
+  pointer-events: none;
+}
+.p-bottom > * { pointer-events: auto; }
+.p-bottom__left { grid-area: left; display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-2); min-width: 0; }
+.p-bottom__right { grid-area: right; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; pointer-events: none; min-width: 0; }
+.p-bottom__left .btn { --btn-h: var(--tap-min); }
+.p-zoom { grid-area: zoom; display: flex; align-items: center; gap: 2px; padding: 4px; border: 1px solid var(--glass-border); border-radius: var(--radius-full); background: var(--glass-bg-strong); box-shadow: var(--highlight-inset), var(--shadow-2); }
+.p-zoom .btn { --btn-h: var(--tap-min); border-radius: 50%; }
+.p-zoom__value { min-width: 56px; height: var(--tap-min); padding: 0 var(--space-1); border: 0; border-radius: var(--radius-full); background: transparent; color: var(--text-2); font: var(--fw-bold) var(--fs-md) var(--font-body); font-variant-numeric: tabular-nums; }
+.p-zoom__value:active { background: var(--accent-wash-strong); color: var(--accent-hi); }
+
+/* ── Tool rail: Ping, Measure, End turn, down the right edge like the GM's rail ─────────────────── */
+.p-tools {
+  position: absolute; z-index: var(--z-overlay-ui); top: 50%; right: calc(var(--space-2) + env(safe-area-inset-right, 0px)); transform: translateY(-50%);
+  display: flex; flex-direction: column; align-items: stretch; gap: 2px; padding: 4px;
+  border: 1px solid var(--glass-border); border-radius: var(--radius-lg); background: var(--glass-bg-strong); box-shadow: var(--highlight-inset), var(--shadow-2);
+}
+.p-tools__sep { height: 1px; margin: 3px 10px; background: var(--border); }
+.p-tool {
+  position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+  width: 60px; min-height: 60px; padding: 7px 2px 6px; border: 1px solid transparent; border-radius: var(--radius-md); background: transparent;
+  color: var(--text-2); font: var(--fw-semibold) 11px/1 var(--font-body); letter-spacing: .01em;
+  -webkit-tap-highlight-color: transparent; touch-action: manipulation; user-select: none;
+  transition: background var(--dur-fast), border-color var(--dur-fast), color var(--dur-fast), box-shadow var(--dur-fast);
+}
+.p-tool .icon { color: var(--accent); }
+.p-tool:active:not(:disabled) { background: var(--accent-wash-strong); color: var(--accent-hi); }
+/* A mode that is switched on: lit edge bar (a shape), violet wash and a ring, like the GM's active tool. */
+.p-tool.is-active { color: var(--accent-hi); border-color: var(--accent); background: var(--accent-wash-strong); box-shadow: inset 0 0 12px var(--accent-wash); }
+.p-tool.is-active::before { content: ''; position: absolute; left: -6px; top: 14px; bottom: 14px; width: 3px; border-radius: 3px; background: var(--accent); box-shadow: var(--glow-accent); }
+/* End turn on your turn: bright cyan with a soft pulse. The greyed-out state is the other half of the cue. */
+.p-tool.is-ready { color: var(--text); border-color: var(--accent-2); background: var(--accent-2-wash); animation: p-ready 1.8s ease-in-out infinite; }
+.p-tool.is-ready .icon { color: var(--accent-2-hi); }
+.p-tool:disabled { opacity: .45; cursor: not-allowed; }
+@keyframes p-ready { 0%, 100% { box-shadow: 0 0 0 0 transparent; } 50% { box-shadow: 0 0 16px var(--accent-2-glow); } }
+.p-pill, .p-hint { display: inline-flex; align-items: center; gap: 7px; padding: 6px 12px; border: 1px solid var(--glass-border); border-radius: var(--radius-full); background: var(--glass-bg-strong); color: var(--text-2); font: var(--fw-semibold) var(--fs-sm) var(--font-body); box-shadow: var(--shadow-1); }
+.p-pill .icon { color: var(--success); }
+/* The one thing here a player must act on: audio is blocked until they tap. */
+.p-pill.is-action { min-height: var(--tap-min); padding: 0 var(--space-4); border-color: var(--accent); background: var(--surface-4); color: var(--accent-hi); font-size: var(--fs-md); box-shadow: var(--shadow-2), var(--glow-accent); animation: p-breathe 2s ease-in-out infinite; }
+.p-pill.is-action .icon { color: var(--accent-hi); }
+.p-pill.is-action:active { background: var(--accent-wash-strong); }
+.p-hint { max-width: 100%; white-space: normal; text-align: right; line-height: var(--lh-snug); }
+.p-hint.is-warn { color: var(--warning); border-color: var(--warning-lo); }
+
+/* ── Join gate & waiting room ─────────────────────────────────────────────── */
+.gate, .waiting {
+  position: relative; display: flex; flex-direction: column; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; touch-action: manipulation;
+  padding: max(var(--space-5), env(safe-area-inset-top, 0px)) max(var(--space-5), env(safe-area-inset-right, 0px)) max(var(--space-5), env(safe-area-inset-bottom, 0px)) max(var(--space-5), env(safe-area-inset-left, 0px));
+  background: var(--ambient);
+}
+/* A faint field of star-dust behind the card — static, so it costs nothing */
+.gate::before, .waiting::before { content: ''; position: fixed; inset: 0; background-image: var(--stars); opacity: .45; pointer-events: none; }
+.gate > *, .waiting > * { position: relative; }
+.gate--embedded { display: block; height: auto; min-height: 0; padding: 0; background: none; overflow: visible; touch-action: auto; }
+.gate--embedded::before { display: none; }
+
+.gate__card {
+  width: min(100%, 420px); margin: auto; padding: var(--space-8) var(--space-6) var(--space-6);
+  text-align: center; display: flex; flex-direction: column; align-items: stretch; gap: var(--space-3);
+  border: 1px solid var(--glass-border); border-radius: var(--radius-xl);
+  background: linear-gradient(180deg, var(--surface-3), var(--surface-1) 72%);
+  box-shadow: var(--highlight-inset), var(--shadow-3), 0 0 64px rgb(106 79 214 / .18);
+  animation: p-rise-in var(--dur-slow) var(--ease-out);
+}
+.gate__card::before { content: ''; position: absolute; left: 0; right: 0; top: 0; height: 2px; border-radius: var(--radius-xl) var(--radius-xl) 0 0; background: var(--rune-line); pointer-events: none; }
+.gate__card > * { position: relative; }
+.gate__seal { align-self: center; display: grid; place-items: center; width: 104px; height: 104px; margin-bottom: var(--space-1); filter: drop-shadow(0 0 18px var(--accent-glow)); }
+.gate__seal img { display: block; }
+.gate__card .eyebrow { font-size: var(--fs-xs); color: var(--accent-2); }
+.gate__card h1 { font: var(--fw-bold) clamp(28px, 8vw, 38px)/var(--lh-tight) var(--font-display); letter-spacing: .01em; color: var(--text); }
+.gate__card p { font-size: var(--fs-lg); line-height: var(--lh-normal); color: var(--text-2); }
+.gate__field { display: block; }
+.gate__field .input { min-height: 56px; font-size: 19px; text-align: center; }
+.gate__card .btn--ghost { color: var(--text-2); }
+.gate__card .gate__status { display: flex; align-items: center; justify-content: center; gap: var(--space-2); font-size: var(--fs-sm); line-height: var(--lh-snug); color: var(--text-3); }
+.gate__lamp { width: 9px; height: 9px; border-radius: 50%; background: var(--warning); animation: p-pulse 1.2s infinite; }
+.gate__status.is-open .gate__lamp { background: var(--success); animation: none; box-shadow: var(--glow-success); }
+
+/* Inside the "change your name" dialog the card melts away; the dialog is the card. */
+.gate--embedded .gate__card { margin: 0; padding: var(--space-1) 0 0; background: none; border: 0; box-shadow: none; gap: var(--space-3); width: 100%; animation: none; }
+.gate--embedded .gate__card::before, .gate--embedded .gate__seal { display: none; }
+.gate--embedded h1, .gate--embedded .eyebrow { display: none; }
+.gate--embedded .gate__card p { font-size: var(--fs-md); color: var(--text-3); }
+.gate--embedded .gate__field .input { text-align: left; min-height: 52px; }
+
+.waiting { align-items: center; text-align: center; gap: var(--space-4); color: var(--text-2); }
+.waiting > :first-child { margin-top: auto; }
+.waiting > :last-child { margin-bottom: auto; }
+.waiting__die { color: var(--accent); filter: drop-shadow(0 0 18px var(--accent-glow)); animation: p-float 3.6s ease-in-out infinite; }
+.waiting h1 { font: var(--fw-bold) clamp(24px, 6.5vw, 32px)/var(--lh-snug) var(--font-display); letter-spacing: .02em; color: var(--text); animation: p-breathe 3.6s ease-in-out infinite; max-width: 22ch; }
+.waiting p { max-width: 34ch; font-size: var(--fs-lg); line-height: var(--lh-normal); color: var(--text-2); }
+.waiting strong { color: var(--accent-hi); }
+
+/* ── Phones, portrait: stack the thumb zone, turn the menu into a bottom sheet ── */
+@media (max-width: 520px) {
+  .p-top__row { grid-template-columns: minmax(0, 1fr) auto; }
+  .p-initiative { grid-column: 1; justify-self: start; }
+  .p-top__right { grid-column: 2; padding: 3px; }
+  /* Dot only while all is well; words as soon as something needs attention */
+  .p-chip:not(.is-warn):not(.is-bad) { padding-left: var(--space-2); }
+  .p-chip:not(.is-warn):not(.is-bad) .p-chip__label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; }
+  .p-top__right:has(.p-chip.is-bad), .p-top__right:has(.p-chip.is-warn) { padding-left: var(--space-3); }
+
+  /* Rows, top to bottom: hints, audio / handout, zoom (closest to the thumb) */
+  .p-bottom { grid-template-columns: minmax(0, 1fr); grid-template-areas: 'right' 'left' 'zoom'; justify-items: center; }
+  .p-bottom__left, .p-bottom__right { flex-direction: row; flex-wrap: wrap; justify-content: center; align-items: center; }
+  .p-bottom__right:empty, .p-bottom__left:empty { display: none; }
+  .p-hint { text-align: center; }
+  .player-page .toasts { bottom: calc(152px + env(safe-area-inset-bottom, 0px)); }
+
+  .p-scrim { background: rgb(4 6 18 / .5); }
+  .p-menu { top: auto; right: calc(var(--space-2) + env(safe-area-inset-right, 0px)); left: calc(var(--space-2) + env(safe-area-inset-left, 0px)); bottom: calc(var(--space-2) + env(safe-area-inset-bottom, 0px)); width: auto; max-width: 440px; margin: 0 auto; max-height: calc(100dvh - 96px); animation: p-rise-in var(--dur) var(--ease-out); }
+}
+
+/* ── Phones, landscape (short): tighter HUD, scrollable gate ──────────────── */
+@media (max-height: 520px) {
+  .p-tool { width: 54px; min-height: 52px; padding: 5px 2px 4px; gap: 3px; }
+  .p-tool .icon { width: 20px; height: 20px; }
+  .p-top { gap: 6px; padding-top: calc(6px + env(safe-area-inset-top, 0px)); }
+  .p-initiative { --card-w: 46px; }
+  .p-initiative__list { padding-top: 7px; }
+  .p-initiative__list li { flex-basis: 66px; }
+  .p-initiative__name { max-width: 62px; }
+  .p-initiative__vitals { max-width: 62px; }
+  .p-turn { padding: 6px 16px; }
+  .p-bottom { padding-bottom: calc(var(--space-2) + env(safe-area-inset-bottom, 0px)); }
+  .player-page .toasts { bottom: calc(72px + env(safe-area-inset-bottom, 0px)); }
+  .p-menu { top: calc(60px + env(safe-area-inset-top, 0px)); max-height: calc(100dvh - 72px - env(safe-area-inset-top, 0px)); }
+
+  .gate { padding-top: max(var(--space-3), env(safe-area-inset-top, 0px)); padding-bottom: max(var(--space-3), env(safe-area-inset-bottom, 0px)); }
+  .gate__card { width: min(100%, 520px); padding: var(--space-4) var(--space-5); gap: var(--space-2); }
+  .gate__seal, .gate__seal img { width: 64px; height: 64px; }
+  .gate__card h1 { font-size: 26px; }
+  .gate__card p { font-size: var(--fs-md); }
+  .waiting { gap: var(--space-2); }
+  .waiting__die img { width: 52px; height: 52px; }
+}
+
+/* ── Tablets and shared displays: roomier turn order ──────────────────────── */
+@media (min-width: 768px) and (min-height: 521px) {
+  .p-initiative { --card-w: 70px; }
+  .p-initiative__list li { flex-basis: 86px; }
+  .p-initiative__name, .p-initiative__vitals { max-width: 82px; }
+  .player-page .toasts { bottom: calc(84px + env(safe-area-inset-bottom, 0px)); }
+}
+
+@media (display-mode: fullscreen) { .p-menu { top: calc(64px + env(safe-area-inset-top, 0px)); } }
+
+/* ── Touch screens: no sticky hover. Press feedback comes from :active ─────── */
+@media (hover: none) {
+  .p-zoom .btn--ghost:hover:not(:disabled), .p-initiative > .btn--ghost:hover:not(:disabled) { background: transparent; color: var(--text-2); box-shadow: none; }
+  .p-top__right .btn--secondary:hover:not(:disabled) { border-color: var(--border-strong); color: var(--text); background: linear-gradient(180deg, var(--surface-3), var(--surface-2)); box-shadow: var(--highlight-inset), var(--shadow-1); }
+  .p-zoom .btn--ghost:active:not(:disabled), .p-initiative > .btn--ghost:active:not(:disabled) { background: var(--accent-wash-strong); color: var(--accent-hi); }
+}
+
+/* Windows high-contrast / forced colours: keep the HUD edges visible */
+@media (forced-colors: active) {
+  .p-tool.is-active { outline: 2px solid Highlight; }
+  .p-top__right, .p-tools, .p-initiative, .p-zoom, .p-pill, .p-hint, .p-banner, .p-turn, .p-menu, .gate__card, .portrait { border: 1px solid CanvasText; }
+  .portrait.is-active::after { box-shadow: 0 0 0 2px Highlight; }
+}
+
+/* ── Table screens: code entry, waiting, locked, removed ─────────────────── */
+.gate__icon { align-self: center; display: grid; place-items: center; width: 84px; height: 84px; border-radius: 50%; color: var(--accent); background: var(--accent-wash); border: 1px solid var(--accent-lo); box-shadow: 0 0 28px var(--accent-wash-strong); }
+.gate__icon.is-pulsing { animation: p-breathe 2.4s ease-in-out infinite; }
+.gate__card .gate__code { font-family: var(--font-mono); font-size: 28px; letter-spacing: .14em; text-transform: uppercase; }
+.gate__card .gate__help { min-height: 2.6em; font-size: var(--fs-sm); line-height: var(--lh-snug); color: var(--text-3); }
+.gate__card .gate__help.is-error { color: var(--warning-hi); }
