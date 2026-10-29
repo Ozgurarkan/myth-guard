@@ -158,11 +158,14 @@ export function createHandshake({ devices, invite, store, limiter, hostGuard, cl
       if (!body || typeof body !== 'object' || Array.isArray(body)) return denied(400, 'bad-request', 'malformed');
       if (body.v !== PROTOCOL_VERSION) return denied(400, 'version', 'malformed');
       const { device, nonce, how } = body;
-      if (!isHex(device, 16) || !isHex(nonce, 16) || (how !== 'link' && how !== 'code')) return denied(400, 'bad-request', 'malformed');
+      if (!isHex(device, 16) || !isHex(nonce, 16) || (how !== 'link' && how !== 'code' && how !== 'open')) return denied(400, 'bad-request', 'malformed');
       const proof = isHex(body.proof, 32) ? body.proof : '';
 
       const existing = devices.find(device);
       if (!existing && mode() === 'locked') return denied(403, 'locked');
+
+      // Entering by just opening the address is allowed unless the GM asked for the QR code or typed code.
+      if (how === 'open' && store.data.codeRequired === true) return denied(403, 'code-required', 'proof');
 
       const checked = invite.verify(how, device, nonce, proof);
       if (!checked.ok) {

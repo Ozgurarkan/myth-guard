@@ -45,7 +45,7 @@ const RETRY_MS = { locked: 15000, full: 15000, rate: 15000, banned: 60000, netwo
  * unauthorized needs-invite rogue-server.
  */
 export function createPlayerLink({
-  onState, onConnection, onGm, onIdentity, onLatency, onMoveRejected, onPing, onTurnRejected,
+  onState, onConnection, onGm, onIdentity, onLatency, onMoveRejected, onPing, onTokenLive, onTurnRejected,
   onKicked, onLocked, onWaiting, onNetStats, onAudio, onJoinError,
   createTransport = createConnection, transportOptions = {}, readName = () => '',
   store = deviceStore, join, clock = transportOptions.clock ?? createSystemClock(), verifySum = true,
@@ -179,6 +179,7 @@ export function createPlayerLink({
         }
         break;
       case 'MAP_PING': onPing?.(message); break;
+      case 'TOKEN_LIVE': onTokenLive?.(message); break;
       case 'STATE_FULL':
         clock.clearTimeout(resyncTimer);
         state = message.state;
@@ -220,6 +221,8 @@ export function createPlayerLink({
   const link = {
     sendMove: (id, x, y) => act({ type: 'PLAYER_TOKEN_MOVE', id, x, y }, true),
     sendPing: (x, y) => act({ type: 'PLAYER_PING', x, y }, false),
+    /** A hero being dragged; not acknowledged, not resent. */
+    sendLive: (id, x, y) => act({ type: 'PLAYER_TOKEN_LIVE', id, x, y }, false),
     sendEndTurn: tokenId => act({ type: 'PLAYER_END_TURN', tokenId }, true),
     setName: name => act({ type: 'PLAYER_NAME', name }, false),
     /** Pass-through for the audio package (AUDIO_LISTEN, AUDIO_ANSWER, AUDIO_STATS). */

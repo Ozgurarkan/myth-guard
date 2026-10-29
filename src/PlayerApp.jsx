@@ -10,6 +10,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { withPlayerAudio } from './audio/audioChannel';
 import { subscribePlayer, sendPlayerMessage, sendPlayerTokenMove, sendPlayerPing, sendPlayerEndTurn, setPlayerName, getPlayerName, joinWithCode, retryPlayerConnection, getPlayerNetStats } from './broadcast';
 import { emitPing } from './pings';
+import { emitTokenLive } from './liveTokens';
 import { usePlayerAudio } from './audio/usePlayerAudio';
 import { LogoMark } from './brand';
 import { Icon, IconButton, Button, Modal, ToastHost, toast } from './ui';
@@ -80,8 +81,26 @@ function TurnBanner({ combat, tokens, playerId }) {
   return <div className="p-turn" role="alert"><Icon name="swords" size={22} /><div><span className="eyebrow">Your turn</span><strong>{shown}, the moment is yours!</strong></div></div>;
 }
 
+/** TV mode (?tv in the address): a big, read-only table screen for a television or a cast window. */
+const TV = typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('tv');
+
+/** Where the turn order goes: 'side' (a column on the left) on landscape and wide screens and always on a TV, 'top' (a slim strip) on a phone held upright. */
+function useTurnLayout() {
+  const compute = () => (TV || (window.innerWidth >= 640 && window.innerWidth / window.innerHeight >= 4 / 3) ? 'side' : 'top');
+  const [layout, setLayout] = useState(compute);
+  useEffect(() => {
+    const update = () => setLayout(compute());
+    window.addEventListener('resize', update);
+    window.addEventListener('orientationchange', update);
+    return () => { window.removeEventListener('resize', update); window.removeEventListener('orientationchange', update); };
+  }, []);
+  return layout;
+}
+
 export default function PlayerApp() {
-  const [name, setName] = useState(() => getPlayerName());
+  const turnLayout = useTurnLayout();
+  // a TV never asks for a name: it is simply "TV"
+  const [name, setName] = useState(() => { const stored = getPlayerName(); if (stored || !TV) return stored; setPlayerName('TV'); return 'TV'; });
   const [renaming, setRenaming] = useState(false);
   const [playerId, setPlayerId] = useState(null);
   const [ps, setPs] = useState(null);
@@ -136,6 +155,7 @@ export default function PlayerApp() {
     onIdentity: setPlayerId,
     onLatency: setLatency,
     onPing: emitPing,
+    onTokenLive: emitTokenLive,
     onTurnRejected: ({ reason }) => { setEndingTurn(false); toast(TURN_MESSAGES[reason] || TURN_MESSAGES['not-your-turn'], { tone: 'warning' }); },
     onMoveRejected: ({ id, reason }) => {
       setPending(current => { const next = { ...current }; delete next[id]; return next; });
@@ -228,11 +248,12 @@ export default function PlayerApp() {
   };
 
   return (
-    <div className="player-page">
+    <div className={`player-page${TV ? ' is-tv' : ''}`} data-turns={turnLayout}>
+      <InitiativeBar combat={ps.combat} tokens={ps.tokens} playerId={playerId} />
+      <div className="p-stage">
       <PlayerMap ref={mapRef} ps={ps} playerId={playerId} canMove={canMove} pending={pending} tool={tool} onPing={ping} onMoveToken={moveToken} onZoomChange={setZoom} />
       <div className="p-top">
         <div className="p-top__row">
-          <InitiativeBar combat={ps.combat} tokens={ps.tokens} playerId={playerId} />
           <div className="p-top__right">
             <ConnectionChip open={open} gmPresent={gmPresent} latency={latency} />
             <IconButton icon={menuOpen ? 'x' : 'menu'} label="Menu" variant="secondary" onClick={() => setMenuOpen(value => !value)} aria-expanded={menuOpen} />
@@ -281,6 +302,8 @@ export default function PlayerApp() {
           <IconButton icon="plus" label="Zoom in" variant="ghost" onClick={() => mapRef.current?.zoomBy(1.4)} />
           {mine.length > 0 && <IconButton icon="locate-fixed" label="Find my hero" variant="ghost" onClick={findHero} />}
         </div>
+      </div>
+
       </div>
 
       {handout && !handoutHidden && <ImageViewer player src={handout.src} alt="Handout" subtitle="From the Dungeon Master" closeLabel="Hide for now" onClose={() => setDismissed(handout.src)} />}

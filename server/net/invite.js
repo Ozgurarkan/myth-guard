@@ -36,7 +36,8 @@ export function createInvite({ store, clock, limits = LIMITS }) {
      */
     verify(how, device, nonce, proof) {
       let key;
-      if (how === 'link') key = inviteKey('link', invite().secret);
+      if (how === 'open') key = inviteKey('open');
+      else if (how === 'link') key = inviteKey('link', invite().secret);
       else if (how === 'code') {
         if (!api.codeFresh()) {
           // Still do the work, so a stale code cannot be told apart from a wrong one by timing.

@@ -68,3 +68,10 @@ test('the hit points saved on a token never reach a player, only the combat view
   for (const token of view.tokens) assert.equal('maxHp' in token, false, 'a token carries no maxHp to players');
   assert.equal(view.combat.entries.find(e => e.tokenId === 'goblin').maxHp, undefined, 'creature maximums stay hidden');
 });
+
+test('fog squares reach players as a set: a repeated square is sent once', () => {
+  const withRepeats = scene();
+  withRepeats.fogCells = ['1,1', '2,2', '1,1', '3,3', '2,2'];
+  const view = projectForPlayers(withRepeats);
+  assert.deepEqual(view.fogCells, ['1,1', '2,2', '3,3']);
+});

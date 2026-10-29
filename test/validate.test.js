@@ -17,6 +17,8 @@ test('every type in the player and GM catalogues has a validator that accepts a 
     PLAYER_NAME: { name: 'Thorin' },
     PLAYER_TOKEN_MOVE: { aid: 3, id: 'hero', x: 1, y: 2 },
     PLAYER_PING: { x: 1, y: 2 },
+    PLAYER_TOKEN_LIVE: { id: 'hero', x: 1, y: 2 },
+    GM_TOKEN_LIVE: { id: 'hero', x: 1, y: 2 },
     PLAYER_END_TURN: { aid: 4, tokenId: 'hero' },
     AUDIO_LISTEN: { enabled: true, caps: { rtc: true, jbt: false } },
     AUDIO_ANSWER: { sid: 's1', sdp: 'v=0' },

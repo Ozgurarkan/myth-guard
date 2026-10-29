@@ -10,6 +10,7 @@
 // only shared code), so they test the server and are independent of the browser-side links of WP4.
 // If the new stack is not there (yet), startTable throws ServerUnavailable with a readable message.
 import { spawn } from 'node:child_process';
+import { monitorEventLoopDelay, performance } from 'node:perf_hooks';
 import { existsSync, readdirSync, statSync } from 'node:fs';
 import { createServer, request as httpRequest } from 'node:http';
 import { dirname, join } from 'node:path';
@@ -324,6 +325,7 @@ export async function startServer({ stack = defaultStack(), child = false, ...op
     stack, port, base: `http://127.0.0.1:${port}`, realm: null, child: proc,
     get exitCode() { return exitCode; },
     memory: async () => (await ask('memory')).usage,
+    metrics: async () => (await ask('metrics')).metrics,
     gc: async () => { await ask('gc'); },
     close: async () => {
       if (exitCode === null) { proc.send({ type: 'close' }); await Promise.race([new Promise(r => proc.once('exit', r)), sleep(5000)]); }
@@ -416,8 +418,18 @@ if (process.argv[2] === '--child' && process.send) {
   const options = JSON.parse(process.argv[3] ?? '{}');
   try {
     const booted = await bootInProcess(options);
+    // CPU use and event-loop delay since the server booted, for the stress test
+    const loop = monitorEventLoopDelay({ resolution: 5 });
+    loop.enable();
+    const cpuAtStart = process.cpuUsage();
+    const loopStartedAt = performance.now();
     process.on('message', async msg => {
       if (msg.type === 'memory') process.send({ id: msg.id, usage: process.memoryUsage() });
+      else if (msg.type === 'metrics') {
+        const wall = (performance.now() - loopStartedAt) / 1000;
+        const cpu = process.cpuUsage(cpuAtStart);
+        process.send({ id: msg.id, metrics: { cpuPercent: Math.round(((cpu.user + cpu.system) / 1e6 / wall) * 1000) / 10, loop: { mean: loop.mean / 1e6, p50: loop.percentile(50) / 1e6, p99: loop.percentile(99) / 1e6, max: loop.max / 1e6 } } });
+      }
       else if (msg.type === 'gc') { globalThis.gc?.(); process.send({ id: msg.id }); }
       else if (msg.type === 'close') { await booted.close().catch(() => {}); process.exit(0); }
     });

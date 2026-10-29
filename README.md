@@ -11,10 +11,11 @@ same Wi-Fi. No accounts, no internet, nothing leaves your home.
 1. Double-click **`START.bat`**. The first run installs what it needs; after an
    update it spends a few seconds preparing a fast build.
 2. Open **http://localhost:5173** on the GM computer.
-3. Click **Table → Invite players** (or the pill in the header). Players scan the
-   **QR code** with their phone camera, enter a name, and take their seat. A phone
-   with no camera handy can open the address and type the 8-character **table
-   code** instead (shown as `ABCD-EFGH`).
+3. Click **Table → Invite players** (or the pill in the header). Players just open
+   the address shown there (or scan the **QR code**), enter a name, and take their
+   seat. No code is needed. To require one, turn on **Players need the QR code or
+   table code** in the Table tab; they then scan the QR code or type the
+   8-character code (shown as `ABCD-EFGH`).
 4. Choose who may join: **Open** (anyone with the QR code or table code gets in),
    **Ask first** (you press *Admit* for each new device) or **Locked** (no new
    devices; players already seated can reconnect). **Kick** removes a device;
@@ -68,15 +69,17 @@ square, cone · `G` grid · `P` player frame · `S` sheets (`1`–`9`, `←` `�
 
 ## For players
 
-Scan the Game Master's QR code (or open their address and type the table code),
-enter a name, and you're in. In *Ask first* mode you wait until the Game Master
+Open the Game Master's address (or scan their QR code), enter a name, and you're in.
+If the Game Master turned on the code requirement, scan the QR code or type the table code. In *Ask first* mode you wait until the Game Master
 lets you in. A phone remembers the table, so reloading or waking it needs no code;
 private browsing or cleared site data counts as a new device.
 
 * **Pan** with one finger, **pinch** to zoom, or use the buttons. You can look
   around inside the frame the GM chose, never beyond it.
 * **Drag your hero** to move it (when the GM has assigned one and allows movement).
-  The 🎯 button centres the map on your hero.
+  The 🎯 button centres the map on your hero. Everyone else sees your hero move
+  while you drag it (and you see the GM's tokens move as the GM drags them);
+  tokens the GM has hidden, or that stand under fog, are never shown moving.
 * The **turn order** is at the top. When it is your turn, you get a banner and a
   buzz on phones that support it.
 * The **tool rail** on the right edge has three buttons:
@@ -92,11 +95,23 @@ private browsing or cleared site data counts as a new device.
   require a touch before they will play sound).
 * The pill at the top shows your connection. Dropped connections rejoin on their own.
 
+### On a television
+
+Open **Settings → Open the TV view** on the GM screen. A new window opens already joined, with a big
+turn-order list down the left and the whole map beside it, no touch controls, and margins that keep clear of a
+TV's screen edge. Cast that window to a Chromecast or Google TV (in Chrome or Edge: menu → Cast, choose *tab*).
+**Never cast the GM screen**: it shows hidden tokens, the map under the fog and your notes.
+
+The turn order never covers the map: held upright, a phone gets a slim strip across the top (tap the arrow
+for the full list); landscape phones, tablets and the TV get a column down the left.
+
 ---
 
 ## How the networking works
 
-* **Joining is by invitation.** The QR code holds a secret in the
+* **Joining needs no code by default** (anyone on your Wi-Fi who opens the address
+  can sit; use *Ask first* to approve each device, or turn on the code requirement).
+  With the requirement on, joining is by invitation: the QR code holds a secret in the
   part of the link after the `#`, which phones never send over the network. The
   typed table code is a shorter alternative that works only while the Invite
   screen is open (and ten minutes after). Each phone then gets its own key, and

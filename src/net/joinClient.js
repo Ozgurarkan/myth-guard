@@ -23,6 +23,7 @@ const MESSAGES = {
   'bad-invite': 'That invite link is not valid. Scan the QR code again.',
   'bad-code': 'The table code is not valid. It has 8 letters and digits.',
   'bad-proof': 'The invite or the code was not accepted. Ask the Dungeon Master for a new one.',
+  'code-required': 'This table asks for its code or QR code.',
   locked: 'The table is locked.',
   full: 'The table is full.',
   banned: 'Too many wrong tries. Wait a few minutes.',
@@ -57,7 +58,7 @@ export function createJoinClient({ store = deviceStore, fetchImpl, url, env } = 
   let inflight = null;
 
   async function join(how, value) {
-    const key = inviteKey(how, how === 'code' ? value : parseJoinHash(value));
+    const key = inviteKey(how, how === 'code' ? value : how === 'open' ? undefined : parseJoinHash(value));
     if (!key) throw fail(how === 'code' ? 'bad-code' : 'bad-invite');
     const device = store.ensureDevice();
     const nonce = randomHex(16);
@@ -77,7 +78,7 @@ export function createJoinClient({ store = deviceStore, fetchImpl, url, env } = 
       let reason = null;
       try { reason = (await response.json())?.error ?? null; } catch { /* generic body */ }
       if (response.status === 429) throw fail('rate', 429);
-      if (response.status === 403) throw fail(['bad-proof', 'locked', 'full', 'banned'].includes(reason) ? reason : 'refused', 403);
+      if (response.status === 403) throw fail(['bad-proof', 'locked', 'full', 'banned', 'code-required'].includes(reason) ? reason : 'refused', 403);
       throw fail('server', response.status);
     }
 
@@ -97,6 +98,8 @@ export function createJoinClient({ store = deviceStore, fetchImpl, url, env } = 
     joinWithLink: hash => join('link', hash),
     /** `code` is what the person typed (case, spaces and dashes are ignored). */
     joinWithCode: code => join('code', code),
+    /** No invite at all: works when the table does not ask for one. */
+    joinOpen: () => join('open'),
 
     /**
      * Read `#join=<S>` from the address, keep S for this tab only, and remove it from the address bar. Returns S or null.
@@ -127,7 +130,12 @@ export function createJoinClient({ store = deviceStore, fetchImpl, url, env } = 
       const job = (async () => {
         if (store.isMember()) return { status: 'member', device: store.device() };
         const invite = store.invite();
-        if (!invite) return { status: 'needs-invite' };
+        if (!invite) {
+          try { return await client.joinOpen(); } catch (error) {
+            if (error.code === 'code-required') return { status: 'needs-invite' };
+            throw error;
+          }
+        }
         try { return await client.joinWithLink(invite); } catch (error) {
           if (error.code === 'bad-proof') store.clearInvite(); // rotated or wrong: asking again with it is pointless
           throw error;

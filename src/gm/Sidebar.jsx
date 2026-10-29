@@ -34,7 +34,8 @@ export function TabRail() {
   const { state } = useGM();
   const { panelOpen, openPanel, setPanelOpen } = useWorkspace();
   return (
-    <nav className="tab-rail" aria-label="Workspace panels">
+    <nav className="tab-rail" aria-label="Codex sections">
+      <span className="tab-rail__legend">Codex</span>
       {PANELS.map(panel => {
         const active = state.rightTab === panel.id && panelOpen;
         return (
@@ -57,7 +58,7 @@ export function Sidebar() {
   const panel = PANELS.find(item => item.id === state.rightTab) ?? PANELS[0];
   const Body = BODIES[panel.id];
   return (
-    <aside className="panel" aria-label={panel.title}>
+    <aside className="panel codex" aria-label={panel.title}>
       <header className="panel__head">
         <div>
           <span className="eyebrow">{panel.group}</span>

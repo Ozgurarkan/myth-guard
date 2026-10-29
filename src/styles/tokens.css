@@ -262,3 +262,19 @@ a:hover { color: var(--accent-2-hi); }
 .num { font-variant-numeric: lining-nums tabular-nums; }
 .glass { background: var(--glass-bg); border: 1px solid var(--glass-border); box-shadow: var(--highlight-inset), var(--shadow-2); -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur); }
 .text-gradient { background: linear-gradient(100deg, var(--accent-hi), var(--accent-2-hi)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+
+/* --------------------------------------------------------------------------
+   Layout for the command-desk arrangement (codex on the left, tool dock under the map).
+   Sizes and corner radii only: the colours are the moonlit palette defined above.
+   -------------------------------------------------------------------------- */
+:root {
+  --radius-xs: 2px;
+  --radius-sm: 3px;
+  --radius-md: 5px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
+  --header-h: 62px;
+  --rail-w: 78px;
+  --tabs-w: 70px;
+  --panel-w: 392px;
+}

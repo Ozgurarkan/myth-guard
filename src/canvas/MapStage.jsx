@@ -8,15 +8,27 @@ import useImage from 'use-image';
 import { useGM, AREA_TOOL_TYPES } from '../store';
 import { nanoid, snapTo, ftToPx, areaSizeLabel, roundFt, clamp } from '../utils';
 import { usePings } from '../pings';
+import { useTokenLive, createLiveSender } from '../liveTokens';
+import { sendGmTokenLive } from '../broadcast';
+import { getStage, setStage, useStage } from '../stageView';
 import { GridLines, FogCells, TokenArt, MarkerShape, AreaFill, Pings, useMapProxy, useInteracting, areaShape, useFontsVersion, FONT_BODY, CYAN, CYAN_HI, SURFACE_1, INK, INK_STROKE } from './shared';
 
 // ── Tokens ────────────────────────────────────────────────────────────────────
+// While a token is dragged its position is passed to the players as it moves (the server drops it for hidden or fogged tokens).
+const liveSender = createLiveSender(sendGmTokenLive);
+
 function TokenItem({ token, selected, turn, hp, onSelect, onMove, onContextMenu, snap, gridSize }) {
   const hidden = token.visibleToPlayers === false;
   const [dragging, setDragging] = useState(false);
+  const group = useRef(null);
+  const latest = useRef(token);
+  latest.current = token;
+  const home = useCallback(() => ({ x: latest.current.x, y: latest.current.y }), []);
+  useTokenLive(token.id, group, home); // a player dragging their own hero moves it here too
   return (
     <Group
-      x={token.x} y={token.y} draggable opacity={dragging ? 0.8 : 1}
+      ref={group} x={token.x} y={token.y} draggable opacity={dragging ? 0.8 : 1}
+      onDragMove={event => { if (!hidden) liveSender.move(token.id, event.target.x(), event.target.y()); }}
       onMouseDown={event => { event.cancelBubble = true; onSelect(token.id); }}
       onDragStart={() => setDragging(true)}
       onContextMenu={event => {
@@ -27,6 +39,7 @@ function TokenItem({ token, selected, turn, hp, onSelect, onMove, onContextMenu,
         setDragging(false);
         let x = event.target.x(), y = event.target.y();
         if (snap) { x = snapTo(x, gridSize); y = snapTo(y, gridSize); event.target.position({ x, y }); }
+        if (!hidden) liveSender.end(token.id, x, y);
         onMove(token.id, x, y);
       }}
     >
@@ -136,6 +149,71 @@ function PlayerViewOverlay({ rect, onUpdate }) {
 }
 
 // ── Stage ─────────────────────────────────────────────────────────────────────
+/** The map picture, on its own layer. Draws the lighter copy while the view is moving (see useMapProxy). */
+const MapPicture = React.memo(function MapPicture({ frame, mapImage, mapProxy, moving, mapWidth, mapHeight }) {
+  return (
+    <Layer listening={false}>
+      <Rect {...frame} fill="#03050d" stroke="#4458a0" strokeWidth={2} strokeScaleEnabled={false} />
+      {mapImage
+        ? <KImg image={moving && mapProxy ? mapProxy : mapImage} x={0} y={0} width={mapWidth} height={mapHeight} />
+        : <Rect x={0} y={0} width={mapWidth} height={mapHeight} fill="#0e1430" />}
+    </Layer>
+  );
+});
+
+/**
+ * Everything drawn on the map: grid, spell areas, fog, markers, tokens, pings. Memoised on purpose. Panning and zooming change
+ * only the stage's position, so none of these props change and React skips every one of these shapes on each step.
+ */
+const SceneLayers = React.memo(function SceneLayers({ state, dispatch, select, menu, fonts, tempArea, ghost, exactMode, turnId, pings, moving }) {
+  // While the view is moving nobody is clicking tokens, so Konva skips redrawing its hidden click-detection copy of every shape.
+  const interactive = !moving;
+  const hpOf = id => {
+    const entry = state.combat.entries.find(e => e.tokenId === id);
+    return entry?.maxHp ? { fraction: Math.max(0, Math.min(1, entry.hp / entry.maxHp)) } : null;
+  };
+  return (
+    <>
+      {/* 2. Grid */}
+      {state.showGrid && <Layer listening={false}><GridLines gridSize={state.gridSize} color={state.gridColor} opacity={state.gridOpacity} mapW={state.mapWidth} mapH={state.mapHeight} /></Layer>}
+
+      {/* 3. Spell areas */}
+      <Layer key={`areas-${fonts}`} listening={interactive}>
+        {state.areaEffects.map(effect => (
+          <AreaItem key={effect.id} effect={effect} selected={state.selectedId === effect.id} onSelect={select}
+            onMove={(id, x, y) => dispatch({ type: 'AREA_MOVE', id, x, y })} onContextMenu={menu} gridSize={state.gridSize} feetPerCell={state.feetPerCell} />
+        ))}
+        <TempArea temp={tempArea} color={state.activeAreaColor} coneAngle={state.areaConeAngle} gridSize={state.gridSize} feetPerCell={state.feetPerCell} />
+        {exactMode && <GhostArea shape={ghost} color={state.activeAreaColor} gridSize={state.gridSize} feetPerCell={state.feetPerCell} />}
+      </Layer>
+
+      {/* 4. Fog of war */}
+      {state.showFog && state.fogCells.length > 0 && (
+        <Layer listening={false}><FogCells cells={state.fogCells} gridSize={state.gridSize} color={state.fogColor} opacity={Math.min(state.fogOpacity, 0.82)} /></Layer>
+      )}
+
+      {/* 5. Markers — above fog so the GM always sees them */}
+      <Layer key={`markers-${fonts}`} listening={interactive}>
+        {state.markers.map(marker => (
+          <MarkerItem key={marker.id} marker={marker} selected={state.selectedId === marker.id} onSelect={select}
+            onMove={(id, x, y) => dispatch({ type: 'MARKER_MOVE', id, x, y })} onContextMenu={menu} />
+        ))}
+      </Layer>
+
+      {/* 6. Tokens */}
+      <Layer key={`tokens-${fonts}`} listening={interactive}>
+        {state.tokens.map(token => (
+          <TokenItem key={token.id} token={token} selected={state.selectedId === token.id} turn={turnId === token.id} hp={hpOf(token.id)}
+            onSelect={select} onMove={(id, x, y) => dispatch({ type: 'TOKEN_MOVE', id, x, y })} onContextMenu={menu}
+            snap={state.snapToGrid} gridSize={state.gridSize} />
+        ))}
+        {/* Pings from the players: a short ripple where they pointed */}
+        <Pings pings={pings} />
+      </Layer>
+    </>
+  );
+});
+
 export default function MapStage({ containerRef }) {
   const { state, dispatch } = useGM();
   const stageRef = useRef(null);
@@ -143,6 +221,27 @@ export default function MapStage({ containerRef }) {
   const [mapImage] = useImage(state.mapImageSrc || '');
   const mapProxy = useMapProxy(mapImage);
   const [moving, poke] = useInteracting();
+  const stage = useStage();
+  const commitTimer = useRef(null);
+  const committed = useRef(null);
+  // Pan and zoom change dozens of times a second. They live in a store of their own (stageView.js), so only this map redraws
+  // on each step; the shared scene state hears about the new view once, shortly after the movement stops.
+  const moveStage = useCallback(next => {
+    setStage(next);
+    clearTimeout(commitTimer.current);
+    commitTimer.current = setTimeout(() => {
+      const v = getStage();
+      committed.current = v;
+      dispatch({ type: 'STAGE_SET', x: v.x, y: v.y, scale: v.scale });
+    }, 160);
+  }, [dispatch]);
+  useEffect(() => () => clearTimeout(commitTimer.current), []);
+  // A scene load or reset changes the view from outside: follow it (but never rewind our own, newer movement).
+  useEffect(() => {
+    const mine = committed.current;
+    if (mine && mine.x === state.stageX && mine.y === state.stageY && mine.scale === state.stageScale) return;
+    setStage({ x: state.stageX, y: state.stageY, scale: state.stageScale });
+  }, [state.stageX, state.stageY, state.stageScale]);
   const [tempArea, setTempArea] = useState(null);
   const [ghost, setGhost] = useState(null);
   const fonts = useFontsVersion();
@@ -175,8 +274,8 @@ export default function MapStage({ containerRef }) {
   const fit = useCallback(() => {
     if (!size.width || !size.height) return;
     const scale = clamp(Math.min(size.width / state.mapWidth, size.height / state.mapHeight) * 0.94, 0.04, 4);
-    dispatch({ type: 'STAGE_SET', scale, x: (size.width - state.mapWidth * scale) / 2, y: (size.height - state.mapHeight * scale) / 2 });
-  }, [size, state.mapWidth, state.mapHeight, dispatch]);
+    moveStage({ scale, x: (size.width - state.mapWidth * scale) / 2, y: (size.height - state.mapHeight * scale) / 2 });
+  }, [size, state.mapWidth, state.mapHeight, moveStage]);
 
   // Each new map (or scene) starts fitted to the window.
   const mapKey = `${state.mapImageSrc ? state.mapImageSrc.length : 0}:${state.mapWidth}x${state.mapHeight}:${state.currentMapId}`;
@@ -190,20 +289,22 @@ export default function MapStage({ containerRef }) {
     const onView = event => {
       const detail = event.detail || {};
       if (detail.fit) { fit(); return; }
-      const scale = detail.reset ? 1 : clamp(state.stageScale * (detail.zoom || 1), 0.04, 12);
+      const cur = getStage();
+      const scale = detail.reset ? 1 : clamp(cur.scale * (detail.zoom || 1), 0.04, 12);
       const cx = size.width / 2, cy = size.height / 2;
-      const mx = (cx - state.stageX) / state.stageScale, my = (cy - state.stageY) / state.stageScale;
-      dispatch({ type: 'STAGE_SET', scale, x: cx - mx * scale, y: cy - my * scale });
+      const mx = (cx - cur.x) / cur.scale, my = (cy - cur.y) / cur.scale;
+      moveStage({ scale, x: cx - mx * scale, y: cy - my * scale });
     };
     window.addEventListener('realm:view', onView);
     return () => window.removeEventListener('realm:view', onView);
-  }, [fit, size, state.stageScale, state.stageX, state.stageY, dispatch]);
+  }, [fit, size, moveStage]);
 
   const toMap = useCallback(() => {
     const pos = stageRef.current?.getPointerPosition();
     if (!pos) return { x: 0, y: 0 };
-    return { x: (pos.x - state.stageX) / state.stageScale, y: (pos.y - state.stageY) / state.stageScale };
-  }, [state.stageX, state.stageY, state.stageScale]);
+    const cur = getStage();
+    return { x: (pos.x - cur.x) / cur.scale, y: (pos.y - cur.y) / cur.scale };
+  }, []);
 
   /** Build a shape of exactly the feet the GM typed, anchored at `pt`. */
   const buildExactShape = useCallback((pt, rotation = 0) => {
@@ -229,11 +330,11 @@ export default function MapStage({ containerRef }) {
     poke();
     const stage = stageRef.current;
     const pointer = stage.getPointerPosition();
-    const old = state.stageScale;
+    const { x: sx, y: sy, scale: old } = getStage();
     const scale = clamp(event.evt.deltaY < 0 ? old * 1.08 : old / 1.08, 0.04, 12);
-    const mp = { x: (pointer.x - state.stageX) / old, y: (pointer.y - state.stageY) / old };
-    dispatch({ type: 'STAGE_SET', x: pointer.x - mp.x * scale, y: pointer.y - mp.y * scale, scale });
-  }, [state.stageScale, state.stageX, state.stageY, dispatch, poke]);
+    const mp = { x: (pointer.x - sx) / old, y: (pointer.y - sy) / old };
+    moveStage({ x: pointer.x - mp.x * scale, y: pointer.y - mp.y * scale, scale });
+  }, [moveStage, poke]);
 
   const cellOf = pt => ({ col: Math.floor(pt.x / state.gridSize), row: Math.floor(pt.y / state.gridSize) });
 
@@ -294,7 +395,8 @@ export default function MapStage({ containerRef }) {
       const dy = event.evt.clientY - panLast.current.y;
       panLast.current = { x: event.evt.clientX, y: event.evt.clientY };
       poke();
-      dispatch({ type: 'STAGE_SET', x: state.stageX + dx, y: state.stageY + dy, scale: state.stageScale });
+      const cur = getStage();
+      moveStage({ x: cur.x + dx, y: cur.y + dy, scale: cur.scale });
       return;
     }
     if (isPaintingFog.current) paintFog(state.activeTool === 'fogErase');
@@ -343,10 +445,6 @@ export default function MapStage({ containerRef }) {
 
   const cursor = { pan: 'grab', fog: 'cell', fogErase: 'cell', areaCircle: 'crosshair', areaRect: 'crosshair', areaCone: 'crosshair', marker: 'crosshair' }[state.activeTool] ?? 'default';
   const turnId = state.combat.activeId;
-  const hpOf = id => {
-    const entry = state.combat.entries.find(e => e.tokenId === id);
-    return entry?.maxHp ? { fraction: Math.max(0, Math.min(1, entry.hp / entry.maxHp)) } : null;
-  };
   const select = useCallback(id => dispatch({ type: 'SELECT', id }), [dispatch]);
   const menu = useCallback(m => dispatch({ type: 'CONTEXT_MENU_SHOW', menu: m }), [dispatch]);
   const frame = useMemo(() => ({ x: -10, y: -10, width: state.mapWidth + 20, height: state.mapHeight + 20 }), [state.mapWidth, state.mapHeight]);
@@ -357,56 +455,14 @@ export default function MapStage({ containerRef }) {
   return (
     <Stage
       ref={stageRef} width={size.width} height={size.height}
-      x={state.stageX} y={state.stageY} scaleX={state.stageScale} scaleY={state.stageScale}
+      x={stage.x} y={stage.y} scaleX={stage.scale} scaleY={stage.scale}
       onWheel={handleWheel} onMouseDown={handleMouseDown} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp}
       onMouseLeave={() => { isPanning.current = false; isAimingCone.current = false; setGhost(null); }}
       onClick={() => { if (state.contextMenu) dispatch({ type: 'CONTEXT_MENU_HIDE' }); }}
       style={{ cursor, display: 'block' }}
     >
-      {/* 1. The map, resting on the table */}
-      <Layer listening={false}>
-        <Rect {...frame} fill="#03050d" stroke="#4458a0" strokeWidth={2} strokeScaleEnabled={false} />
-        {mapImage
-          ? <KImg image={moving && mapProxy ? mapProxy : mapImage} x={0} y={0} width={state.mapWidth} height={state.mapHeight} />
-          : <Rect x={0} y={0} width={state.mapWidth} height={state.mapHeight} fill="#0e1430" />}
-      </Layer>
-
-      {/* 2. Grid */}
-      {state.showGrid && <Layer listening={false}><GridLines gridSize={state.gridSize} color={state.gridColor} opacity={state.gridOpacity} mapW={state.mapWidth} mapH={state.mapHeight} /></Layer>}
-
-      {/* 3. Spell areas */}
-      <Layer key={`areas-${fonts}`}>
-        {state.areaEffects.map(effect => (
-          <AreaItem key={effect.id} effect={effect} selected={state.selectedId === effect.id} onSelect={select}
-            onMove={(id, x, y) => dispatch({ type: 'AREA_MOVE', id, x, y })} onContextMenu={menu} gridSize={state.gridSize} feetPerCell={state.feetPerCell} />
-        ))}
-        <TempArea temp={tempArea} color={state.activeAreaColor} coneAngle={state.areaConeAngle} gridSize={state.gridSize} feetPerCell={state.feetPerCell} />
-        {exactMode && <GhostArea shape={ghost} color={state.activeAreaColor} gridSize={state.gridSize} feetPerCell={state.feetPerCell} />}
-      </Layer>
-
-      {/* 4. Fog of war */}
-      {state.showFog && state.fogCells.length > 0 && (
-        <Layer listening={false}><FogCells cells={state.fogCells} gridSize={state.gridSize} color={state.fogColor} opacity={Math.min(state.fogOpacity, 0.82)} /></Layer>
-      )}
-
-      {/* 5. Markers — above fog so the GM always sees them */}
-      <Layer key={`markers-${fonts}`}>
-        {state.markers.map(marker => (
-          <MarkerItem key={marker.id} marker={marker} selected={state.selectedId === marker.id} onSelect={select}
-            onMove={(id, x, y) => dispatch({ type: 'MARKER_MOVE', id, x, y })} onContextMenu={menu} />
-        ))}
-      </Layer>
-
-      {/* 6. Tokens */}
-      <Layer key={`tokens-${fonts}`}>
-        {state.tokens.map(token => (
-          <TokenItem key={token.id} token={token} selected={state.selectedId === token.id} turn={turnId === token.id} hp={hpOf(token.id)}
-            onSelect={select} onMove={(id, x, y) => dispatch({ type: 'TOKEN_MOVE', id, x, y })} onContextMenu={menu}
-            snap={state.snapToGrid} gridSize={state.gridSize} />
-        ))}
-        {/* Pings from the players: a short ripple where they pointed */}
-        <Pings pings={pings} scale={state.stageScale} />
-      </Layer>
+      <MapPicture frame={frame} mapImage={mapImage} mapProxy={mapProxy} moving={moving} mapWidth={state.mapWidth} mapHeight={state.mapHeight} />
+      <SceneLayers state={state} dispatch={dispatch} select={select} menu={menu} fonts={fonts} tempArea={tempArea} ghost={ghost} exactMode={exactMode} turnId={turnId} pings={pings} moving={moving} />
 
       {/* 7. Player view frame (GM only) */}
       {state.playerViewEnabled && <PlayerViewOverlay rect={state.playerViewRect} onUpdate={rect => dispatch({ type: 'PV_SET_RECT', rect })} />}

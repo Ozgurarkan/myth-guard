@@ -28,3 +28,4 @@ mobile/player/
 *.jks
 *.p12
 *.mobileprovision
+.backup-pre-recolor/

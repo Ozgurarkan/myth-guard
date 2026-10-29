@@ -14,7 +14,7 @@ const freshStore = () => createDeviceStore({ local: null, session: null });
 const reply = (status, body) => ({ ok: status >= 200 && status < 300, status, json: async () => body });
 
 /** A server that follows 4.3, written from the spec: checks the proof, answers with srvProof. */
-function fakeServer({ link = secret, table = code, status = 'admitted', rogue = false, refuse = null } = {}) {
+function fakeServer({ link = secret, table = code, status = 'admitted', rogue = false, refuse = null, codeRequired = true } = {}) {
   const calls = [];
   const server = {
     calls, derived: new Map(),
@@ -22,7 +22,8 @@ function fakeServer({ link = secret, table = code, status = 'admitted', rogue = 
       const body = JSON.parse(init.body);
       calls.push({ url: String(input), init, body });
       if (refuse) return reply(refuse.status, refuse.body);
-      const key = body.how === 'link' ? link : `code:${table}`;
+      if (body.how === 'open' && codeRequired) return reply(403, { error: 'code-required' });
+      const key = body.how === 'link' ? link : body.how === 'open' ? 'open:table' : `code:${table}`;
       if (!safeEqualHex(joinProof(key, body.device, body.nonce), body.proof)) return reply(403, { error: 'bad-proof' });
       const srv = randomHex(16);
       server.derived.set(body.device, deriveDk(key, body.device, body.nonce, srv));
@@ -132,15 +133,15 @@ test('ensureJoined: member when it holds device and key, needs-invite when it ha
   const server = fakeServer();
   const { store, client } = clientFor(server);
   assert.deepEqual(await client.ensureJoined(), { status: 'needs-invite' });
-  assert.equal(server.calls.length, 0);
+  assert.deepEqual(server.calls.map(call => call.body.how), ['open'], 'it first tries to walk in without a code');
   store.setInvite(secret);
   const joined = await client.ensureJoined();
   assert.equal(joined.status, 'admitted');
   assert.equal(store.invite(), null, 'a spent invite is not kept');
-  assert.equal(server.calls.length, 1);
+  assert.equal(server.calls.length, 2);
   const again = await client.ensureJoined();
   assert.equal(again.status, 'member');
-  assert.equal(server.calls.length, 1, 'a member never asks the network');
+  assert.equal(server.calls.length, 2, 'a member never asks the network');
 });
 
 test('ensureJoined drops a rotated invite (bad-proof) but keeps one that was merely refused for now', async () => {
@@ -195,4 +196,22 @@ test('replaying the same device with the same invite twice keeps one identity', 
   assert.equal(server.calls[1].body.device, device);
   assert.notEqual(server.calls[1].body.nonce, server.calls[0].body.nonce, 'a fresh nonce for every attempt');
   assert.equal(store.dk(), server.derived.get(device), 'the key follows the newest derivation');
+});
+
+test('a table that asks for no code lets a device in with nothing but the address', async () => {
+  const server = fakeServer({ codeRequired: false });
+  const { store, client } = clientFor(server);
+  assert.equal(store.isMember(), false);
+  const result = await client.ensureJoined();
+  assert.equal(result.status, 'admitted');
+  assert.equal(server.calls[0].body.how, 'open');
+  assert.equal(store.isMember(), true, 'the device keeps its key like any other join');
+  assert.deepEqual(await client.ensureJoined(), { status: 'member', device: store.device() });
+});
+
+test('without an invite, a table that wants a code sends the player to the code screen; an ask-first table says pending', async () => {
+  const strict = clientFor(fakeServer({ codeRequired: true }));
+  assert.deepEqual(await strict.client.ensureJoined(), { status: 'needs-invite' });
+  const ask = clientFor(fakeServer({ codeRequired: false, status: 'pending' }));
+  assert.equal((await ask.client.ensureJoined()).status, 'pending');
 });

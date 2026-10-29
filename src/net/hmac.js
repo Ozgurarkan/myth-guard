@@ -124,6 +124,8 @@ export const inviteKey = (how, value) => {
     const code = normalizeCode(value);
     return code ? `code:${code}` : null;
   }
+  // Entry without a code (the table does not ask for one): the key is public, so it proves nothing, but every later step is unchanged.
+  if (how === 'open') return 'open:table';
   return null;
 };
 

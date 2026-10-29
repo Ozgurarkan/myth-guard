@@ -6,6 +6,7 @@ import { tokenKind } from '../combat.js';
 import { Modal, Button, Input, Select, Field, Segmented, Swatches, Switch, Icon, Avatar, Badge, toast } from '../ui';
 import { TOKEN_COLORS } from '../gm/palettes';
 import ImageCropper from './ImageCropper';
+import { getStage } from '../stageView';
 
 const BLANK = { name: '', characterType: 'pc', maxHp: null, gridSize: 1, color: '#a58bff', borderWidth: 8, imageSrc: null, portraitSrc: null, portraitSource: null, showNumber: false, number: 1 };
 const SIZES = [
@@ -86,8 +87,9 @@ export default function AddTokenModal() {
     }
     // Drop the new token in the middle of what the GM is looking at.
     const canvas = document.querySelector('.canvas-area');
-    const cx = (-state.stageX + (canvas?.clientWidth ?? window.innerWidth) / 2) / state.stageScale;
-    const cy = (-state.stageY + (canvas?.clientHeight ?? window.innerHeight) / 2) / state.stageScale;
+    const view = getStage();
+    const cx = (-view.x + (canvas?.clientWidth ?? window.innerWidth) / 2) / view.scale;
+    const cy = (-view.y + (canvas?.clientHeight ?? window.innerHeight) / 2) / view.scale;
     const snap = state.snapToGrid ? state.gridSize : 1;
     dispatch({ type: 'TOKEN_ADD', token: { id: nanoid(), x: Math.round(cx / snap) * snap, y: Math.round(cy / snap) * snap, ...form } });
   };

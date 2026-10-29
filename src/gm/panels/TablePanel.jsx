@@ -2,7 +2,7 @@
 import React from 'react';
 import { Button, Select, Switch, EmptyState, Avatar, Icon, ask } from '../../ui';
 import { sendTableCommand } from '../../broadcast';
-import { answerRequest } from '../tableState';
+import { answerRequest, useTableState } from '../tableState';
 import { useGM } from '../../store';
 import { useWorkspace } from '../workspace';
 import { PanelSection } from './PanelParts';
@@ -23,6 +23,7 @@ function Ping({ rtt }) {
 export function TablePanel() {
   const { state, dispatch } = useGM();
   const { setSessionOpen } = useWorkspace();
+  const { table } = useTableState();
   const heroes = state.tokens;
   const unowned = heroes.filter(token => !token.ownerId);
   const assign = (tokenId, ownerId) => {
@@ -44,6 +45,10 @@ export function TablePanel() {
   return (
     <div>
       <Button variant="primary" block icon="qr-code" onClick={() => setSessionOpen(true)}>Invite players — address &amp; QR code</Button>
+      <div className="panel-card panel-card--tight">
+        <Switch checked={table?.codeRequired === true} onChange={() => sendTableCommand('entry', { required: table?.codeRequired !== true })}
+          label="Players need the QR code or table code" hint="Off: anyone on your Wi-Fi who opens the address can join. Turn on to ask for the code, or choose to approve each device first." />
+      </div>
       <div className="panel-card panel-card--tight">
         <Switch checked={state.playerCanMoveTokens} onChange={() => dispatch({ type: 'PV_TOGGLE_TOKEN_MOVE' })}
           label="Players can move their own tokens" hint="Turn off for cutscenes or when the screen is a shared display." />

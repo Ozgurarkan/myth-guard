@@ -17,7 +17,7 @@ import { validateFrame } from './validate.js';
 import { createSession, timers, safeMetrics } from './session.js';
 import { createStateSync } from './stateSync.js';
 import { createRoster } from './roster.js';
-import { moveToken, mapPing, endTurn, createMemory } from './actions.js';
+import { moveToken, mapPing, endTurn, createMemory, playerLiveMove, gmLiveMove } from './actions.js';
 
 export const LEGACY_PATH = '/session-sync';
 export const LEGACY_MESSAGE = 'Myth Guard was updated. Reload this page.';
@@ -158,7 +158,7 @@ export function createHub({ access, metrics, clock, extensions = [], limits: lim
     const table = access.table;
     let code = null;
     try { code = table?.invite?.()?.code ?? null; } catch { /* no invite yet */ }
-    return { type: 'TABLE', mode: table?.mode?.() ?? 'open', locked: Boolean(table?.locked?.()), code };
+    return { type: 'TABLE', mode: table?.mode?.() ?? 'open', locked: Boolean(table?.locked?.()), codeRequired: Boolean(table?.codeRequired?.()), code };
   }
   const sendTable = () => sendGm(tableMessage());
 
@@ -220,6 +220,7 @@ export function createHub({ access, metrics, clock, extensions = [], limits: lim
       case 'unlock': table.unlock(); break;
       case 'rotate': table.rotate(); break;
       case 'mode': table.setMode(msg.mode); break;
+      case 'entry': table.setCodeRequired(msg.required === true); break;
       case 'rename':
         if (device) {
           table.rename(device, msg.name);
@@ -319,6 +320,18 @@ export function createHub({ access, metrics, clock, extensions = [], limits: lim
       broadcastPlayers(result.ping, { droppable: true });
       sendGm(result.ping);
     },
+    PLAYER_TOKEN_LIVE(s, msg) {
+      // Nothing is stored or acknowledged: a frame that is late or refused is simply lost, the next one replaces it.
+      const frame = playerLiveMove({ scene: stateSync.scene, actor: s, msg, gmPresent: gmPresent() });
+      if (!frame) { m.inc('live.dropped'); return; }
+      const text = JSON.stringify({ type: 'TOKEN_LIVE', id: frame.id, x: frame.x, y: frame.y });
+      for (const other of players()) {
+        if (keyOf(other) === keyOf(s) || other.bufferedAmount > limits.backlogStopBytes) continue;
+        other.send(text);
+      }
+      sendGm(frame);
+      m.inc('live.relayed');
+    },
     PLAYER_END_TURN(s, msg) {
       runAction(s, msg, { action: 'end-turn', id: msg.tokenId }, memoryOfActions => endTurn({
         scene: stateSync.scene, actor: s, msg, gmPresent: gmPresent(), memory: memoryOfActions, now: t.now(),
@@ -331,6 +344,12 @@ export function createHub({ access, metrics, clock, extensions = [], limits: lim
     RESUME() { /* the GM does not resume: it is sent REQUEST_FULL_STATE instead */ },
     SCENE(s, msg) { stateSync.setScene(msg.scene, { defer: true }); },
     TABLE_CMD(s, msg) { tableCommand(msg); },
+    GM_TOKEN_LIVE(s, msg) {
+      const frame = gmLiveMove({ scene: stateSync.scene, msg });
+      if (!frame) { m.inc('live.dropped'); return; }
+      broadcastPlayers(frame, { droppable: true });
+      m.inc('live.relayed');
+    },
   };
 
   function dispatch(s, msg) {

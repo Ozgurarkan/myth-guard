@@ -8,6 +8,7 @@ import Konva from 'konva';
 import { Shape, Group, Circle, Rect, Text, Line, Ellipse, Image as KImg, Arc, RegularPolygon, Star } from 'react-konva';
 import useImage from 'use-image';
 import { PING_MS } from '../pings';
+import { useStage } from '../stageView';
 
 // Canvases are drawn at no more than 1.75x the screen's pixel size. A phone reports 3x, which means nine times the pixels
 // to repaint on every frame of a pan, zoom or pulse, for a sharpness nobody can see on a battle map.
@@ -282,7 +283,9 @@ function PingMarker({ ping, scale }) {
 
 /** Every ping that is still on screen. Place this inside a Konva layer; `scale` is the stage's zoom. */
 export function Pings({ pings, scale }) {
-  return pings.map(ping => <PingMarker key={ping.key} ping={ping} scale={scale} />);
+  const live = useStage();            // the GM map passes no scale: it follows the live zoom without re-rendering its whole scene
+  const zoom = scale ?? live.scale;
+  return pings.map(ping => <PingMarker key={ping.key} ping={ping} scale={zoom} />);
 }
 
 // ── Smooth motion on big maps ────────────────────────────────────────────────
@@ -306,7 +309,7 @@ export function useMapProxy(image) {
 }
 
 /** [moving, poke]: call poke() on every pan, zoom or pinch step; moving stays true until the view has rested for idleMs. */
-export function useInteracting(idleMs = 140) {
+export function useInteracting(idleMs = 220) {
   const [moving, setMoving] = useState(false);
   const timer = useRef(null);
   useEffect(() => () => clearTimeout(timer.current), []);

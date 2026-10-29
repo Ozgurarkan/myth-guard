@@ -1,4 +1,9 @@
 // The turn order, as every player sees it.
+//
+// It never floats over the map. The player screen gives it a place of its own:
+//   * a phone held upright: a slim strip across the top of the screen (the map sits below it); tap the arrow for the full list
+//   * a landscape phone, tablet, laptop window or TV: a column down the left side (the map fits in the space that is left)
+// The same markup serves both; the stylesheet (player.css, "Turn order") decides the shape.
 import React, { useEffect, useRef, useState } from 'react';
 import { initiativeOrder, healthLabel, bloodLevel } from '../combat';
 import { Icon, IconButton } from '../ui';
@@ -30,45 +35,58 @@ function Portrait({ token, entry, active, mine }) {
   );
 }
 
+/** Scroll the list, never the page, so the active combatant is in the middle of it. */
+function centreOn(container, element) {
+  if (!container || !element) return;
+  const sideways = container.scrollWidth > container.clientWidth + 2;
+  if (sideways) container.scrollTo({ left: element.offsetLeft - (container.clientWidth - element.offsetWidth) / 2, behavior: 'smooth' });
+  else container.scrollTo({ top: element.offsetTop - (container.clientHeight - element.offsetHeight) / 2, behavior: 'smooth' });
+}
+
 export function InitiativeBar({ combat, tokens, playerId }) {
   const list = useRef(null);
-  const [collapsed, setCollapsed] = useState(() => window.innerWidth < 640);
+  const [open, setOpen] = useState(false);          // the full list as a drop-down, on a phone held upright
   const order = initiativeOrder(combat);
+  const activeId = combat?.activeId;
   useEffect(() => {
-    list.current?.querySelector('[aria-current="step"]')?.scrollIntoView({ block: 'nearest', inline: 'center', behavior: 'smooth' });
-  }, [combat?.activeId, collapsed]);
+    centreOn(list.current, list.current?.querySelector('[aria-current="step"]'));
+  }, [activeId, open, order.length]);
+  // a new turn closes the drop-down: the strip already shows who is up
+  useEffect(() => { setOpen(false); }, [activeId]);
   if (!order.length) return null;
-  const active = tokens.find(token => token.id === combat.activeId);
+
+  const visible = order.filter(entry => tokens.some(t => t.id === entry.tokenId));
+  const active = tokens.find(token => token.id === activeId);
+  const position = visible.findIndex(entry => entry.tokenId === activeId);
+  const next = position >= 0 && visible.length > 1 ? tokens.find(t => t.id === visible[(position + 1) % visible.length].tokenId) : null;
   return (
-    <section className={`p-initiative${collapsed ? ' is-collapsed' : ''}`} aria-label="Combat initiative">
+    <section className={`p-initiative${open ? ' is-open' : ''}`} aria-label="Combat initiative">
       <div className="p-initiative__round" role="status"><span>Round</span><strong>{combat.round}</strong></div>
-      {collapsed ? (
-        <div className="p-initiative__now">
-          <span className="eyebrow">{active ? 'Current turn' : 'Combat'}</span>
-          <strong>{active ? active.name || 'Unnamed' : `${order.length} combatants`}</strong>
-        </div>
-      ) : (
-        <ol className="p-initiative__list" ref={list} aria-label="Initiative order">
-          {order.map(entry => {
-            const token = tokens.find(t => t.id === entry.tokenId);
-            if (!token) return null;
-            const isActive = entry.tokenId === combat.activeId;
-            const mine = !!playerId && token.ownerId === playerId;
-            return (
-              <li key={entry.tokenId} aria-current={isActive ? 'step' : undefined} title={`${token.name || 'Unnamed'} — ${healthLabel(entry)}`}>
-                <Portrait token={token} entry={entry} active={isActive} mine={mine} />
-                <span className="p-initiative__name">{token.name || 'Unnamed'}</span>
-                <span className={`p-initiative__vitals${toneOf(entry) ? ` is-${toneOf(entry)}` : ''}`}>
-                  <span className="p-initiative__health">{healthLabel(entry)}</span>
-                  {!entry.condition && entry.maxHp ? <span className="p-initiative__hp" aria-hidden="true"><i style={{ '--hp': Math.max(0, Math.min(1, entry.hp / entry.maxHp)) }} /></span> : null}
-                </span>
-                {isActive && <span className="p-initiative__turn">Turn</span>}
-              </li>
-            );
-          })}
-        </ol>
-      )}
-      <IconButton icon={collapsed ? 'chevron-down' : 'chevron-up'} label={collapsed ? 'Show the turn order' : 'Collapse the turn order'} size="sm" onClick={() => setCollapsed(value => !value)} />
+      <div className="p-initiative__now">
+        <span className="eyebrow">{active ? 'Now' : 'Combat'}</span>
+        <strong>{active ? active.name || 'Unnamed' : `${order.length} combatants`}</strong>
+        {next && <span className="p-initiative__next">Up next: {next.name || 'Unnamed'}</span>}
+      </div>
+      <ol className="p-initiative__list" ref={list} aria-label="Initiative order">
+        {order.map(entry => {
+          const token = tokens.find(t => t.id === entry.tokenId);
+          if (!token) return null;
+          const isActive = entry.tokenId === activeId;
+          const mine = !!playerId && token.ownerId === playerId;
+          return (
+            <li key={entry.tokenId} aria-current={isActive ? 'step' : undefined} title={`${token.name || 'Unnamed'} — ${healthLabel(entry)}`}>
+              <Portrait token={token} entry={entry} active={isActive} mine={mine} />
+              <span className="p-initiative__name">{token.name || 'Unnamed'}</span>
+              <span className={`p-initiative__vitals${toneOf(entry) ? ` is-${toneOf(entry)}` : ''}`}>
+                <span className="p-initiative__health">{healthLabel(entry)}</span>
+                {!entry.condition && entry.maxHp ? <span className="p-initiative__hp" aria-hidden="true"><i style={{ '--hp': Math.max(0, Math.min(1, entry.hp / entry.maxHp)) }} /></span> : null}
+              </span>
+              {isActive && <span className="p-initiative__turn">Turn</span>}
+            </li>
+          );
+        })}
+      </ol>
+      <IconButton className="p-initiative__toggle" icon={open ? 'chevron-up' : 'chevron-down'} label={open ? 'Close the turn order' : 'Show the whole turn order'} size="sm" onClick={() => setOpen(value => !value)} aria-expanded={open} />
     </section>
   );
 }

@@ -26,6 +26,7 @@ export function freshTable(clock) {
     serverSecret: randomHex(32),
     mode: 'open',
     modeBeforeLock: 'open',
+    codeRequired: false,
     invite: { secret: randomSecret(), code: randomCode(), rotatedAt: clock.now() },
     limits: { maxAdmittedDevices: LIMITS.maxAdmittedDevices, maxPendingDevices: LIMITS.maxPendingDevices },
     devices: Object.create(null),
@@ -47,6 +48,7 @@ export function sanitizeTable(raw, clock) {
     serverSecret: raw.serverSecret,
     mode: raw.mode,
     modeBeforeLock: ADMISSION_MODES.has(raw.modeBeforeLock) && raw.modeBeforeLock !== 'locked' ? raw.modeBeforeLock : 'open',
+    codeRequired: raw.codeRequired === true,
     invite: { secret: raw.invite.secret, code: raw.invite.code, rotatedAt: isNumber(raw.invite.rotatedAt) ? raw.invite.rotatedAt : clock.now() },
     limits: {
       maxAdmittedDevices: clampInt(raw.limits?.maxAdmittedDevices, 1, 64, LIMITS.maxAdmittedDevices),

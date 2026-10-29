@@ -36,6 +36,7 @@ export function Toolbar() {
   const set = tool => dispatch({ type: 'TOOL_SET', tool });
   return (
     <nav className="rail" aria-label="Tabletop tools">
+      <span className="rail__legend">Table tools</span>
       {TOOL_GROUPS.map(group => (
         <div className="rail__group" key={group.name} role="group" aria-label={group.name}>
           <span className="rail__title">{group.name}</span>

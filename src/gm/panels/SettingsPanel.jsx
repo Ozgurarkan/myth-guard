@@ -1,5 +1,6 @@
 import React from 'react';
-import { Button, ButtonLink, Input, Field, Switch, Segmented, ask, toast } from '../../ui';
+import { Button, Input, Field, Switch, Segmented, ask, toast } from '../../ui';
+import { openPlayerView } from '../openPlayerView';
 import { useGM } from '../../store';
 import { pxPerFoot } from '../../utils';
 import { PanelSection } from './PanelParts';
@@ -70,7 +71,11 @@ export function SettingsPanel() {
           <Switch checked={state.playerCanMoveTokens} onChange={() => dispatch({ type: 'PV_TOGGLE_TOKEN_MOVE' })} label="Players can move their own tokens" />
         </div>
         <div className="panel-gap" />
-        <ButtonLink href="/player.html" target="_blank" rel="noopener" icon="external-link" variant="primary">Open the player view</ButtonLink>
+        <div className="button-row">
+          <Button icon="external-link" variant="primary" onClick={() => openPlayerView()}>Open the player view</Button>
+          <Button icon="monitor-smartphone" onClick={() => openPlayerView({ tv: true })} title="A big, read-only screen for a television. Cast this window to a Chromecast or Google TV.">Open the TV view</Button>
+        </div>
+        <p className="panel-note">The TV view has a large turn order down the side, no touch controls, and keeps clear of a TV's screen edges. Cast that window (never the GM screen) to your television.</p>
       </PanelSection>
     </div>
   );

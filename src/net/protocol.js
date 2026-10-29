@@ -79,7 +79,7 @@ export const LIMITS = deepFreeze({
 
 export const ROLES = frozenSet(['player', 'gm']);
 export const ADMISSION_MODES = frozenSet(['open', 'ask', 'locked']);
-export const TABLE_OPS = frozenSet(['kick', 'admit', 'deny', 'lock', 'unlock', 'rotate', 'mode', 'rename']);
+export const TABLE_OPS = frozenSet(['kick', 'admit', 'deny', 'lock', 'unlock', 'rotate', 'mode', 'rename', 'entry']);
 export const ACK_REASONS = frozenSet(['blocked', 'paused', 'away', 'not-your-turn', 'rate', 'invalid']);
 
 /** Table code: 8 characters from a 31-symbol alphabet with no I, L, O, 0 or 1 (about 39.6 bits). */
@@ -93,26 +93,26 @@ export const CODE_LENGTH = 8;
 /** Player -> server. Anything else from a player is a protocol violation (strike). */
 export const PLAYER_TYPES = frozenSet([
   'PING', 'RESUME', 'RESYNC', 'REQUEST_FULL_STATE', 'PLAYER_NAME', 'PLAYER_TOKEN_MOVE', 'PLAYER_PING',
-  'PLAYER_END_TURN', 'AUDIO_LISTEN', 'AUDIO_ANSWER', 'AUDIO_STATS',
+  'PLAYER_TOKEN_LIVE', 'PLAYER_END_TURN', 'AUDIO_LISTEN', 'AUDIO_ANSWER', 'AUDIO_STATS',
 ]);
 
 /** GM -> server. */
 export const GM_TYPES = frozenSet([
   'PING', 'RESUME', 'SCENE', 'AUDIO_OFFER', 'AUDIO_CONTROLS', 'AUDIO_STATUS', 'AUDIO_SELECT', 'AUDIO_FALLBACK',
-  'AUDIO_STOP', 'TABLE_CMD',
+  'AUDIO_STOP', 'TABLE_CMD', 'GM_TOKEN_LIVE',
 ]);
 
 /** Server -> player. MOVE_REJECTED / TURN_REJECTED / PLAYER_ID are the v2 names the app still uses (ACK is the v3 form). */
 export const SERVER_TO_PLAYER = frozenSet([
   'HELLO', 'STATE_FULL', 'STATE_PATCH', 'GM_STATUS', 'MAP_PING', 'ACK', 'PONG', 'AUDIO_OFFER', 'AUDIO_CONTROLS',
   'AUDIO_STATUS', 'AUDIO_FALLBACK', 'AUDIO_STOP', 'KICKED', 'TABLE_LOCKED', 'WAIT', 'ADMITTED', 'DENIED',
-  'PLAYER_ID', 'MOVE_REJECTED', 'TURN_REJECTED',
+  'PLAYER_ID', 'MOVE_REJECTED', 'TURN_REJECTED', 'TOKEN_LIVE',
 ]);
 
 /** Server -> GM. */
 export const SERVER_TO_GM = frozenSet([
   'HELLO', 'PONG', 'REQUEST_FULL_STATE', 'PLAYER_ROSTER', 'JOIN_REQUEST', 'TABLE', 'PLAYER_TOKEN_MOVE',
-  'PLAYER_END_TURN', 'MAP_PING', 'AUDIO_LISTENER', 'AUDIO_ANSWER', 'AUDIO_STATS',
+  'PLAYER_END_TURN', 'MAP_PING', 'TOKEN_LIVE', 'AUDIO_LISTENER', 'AUDIO_ANSWER', 'AUDIO_STATS',
 ]);
 
 const KiB = 1024;
@@ -136,6 +136,7 @@ export const TYPE_CAPS = deepFreeze({
   PLAYER_NAME: cap(256, 1, 0.5),
   PLAYER_TOKEN_MOVE: cap(192, 40, 30),           // also server -> GM
   PLAYER_PING: cap(128, 2, 1.5),                 // the 700 ms cooldown itself is a rule in actions.js; this is the flood bucket
+  PLAYER_TOKEN_LIVE: cap(128, 20, 40),           // a token being dragged, about 25 times a second; never stored (see liveMove in actions.js)
   PLAYER_END_TURN: cap(160, 3, 1),               // duplicates within 1.5 s are ignored by actions.js; also server -> GM
   AUDIO_LISTEN: cap(256, 2, 1),
   AUDIO_ANSWER: cap(12 * KiB, 3, 3),             // also server -> GM
@@ -149,12 +150,14 @@ export const TYPE_CAPS = deepFreeze({
   AUDIO_FALLBACK: cap(512, 20, 20),              // also server -> player
   AUDIO_STOP: cap(512, 20, 20),                  // also server -> player
   TABLE_CMD: cap(512, 10, 10),
+  GM_TOKEN_LIVE: cap(128, 30, 60),
   // server -> client only (max = largest frame a client or the GM must be prepared to accept)
   HELLO: fromServer(2 * KiB),
   STATE_FULL: fromServer(8 * MiB),               // bounded by the GM's SCENE cap
   STATE_PATCH: fromServer(8 * MiB),
   GM_STATUS: fromServer(128),
   MAP_PING: fromServer(256),
+  TOKEN_LIVE: fromServer(192),                   // a token somebody else is dragging right now
   ACK: fromServer(256),
   PONG: fromServer(128),
   KICKED: fromServer(256),

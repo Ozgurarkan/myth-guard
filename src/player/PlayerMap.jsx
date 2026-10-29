@@ -14,6 +14,8 @@ import { canPlayerMoveToken } from '../ownership.js';
 import { snapTo, clamp } from '../utils';
 import { GridLines, FogCells, TokenArt, MarkerShape, AreaFill, Pings, useMapProxy, useInteracting, useFontsVersion, CYAN, INK, INK_STROKE, FONT_BODY, SURFACE_1 } from '../canvas/shared';
 import { usePings } from '../pings';
+import { useTokenLive, createLiveSender } from '../liveTokens';
+import { sendPlayerTokenLive } from '../broadcast';
 
 Konva.hitOnDragEnabled = true; // keep two-finger pinch working while a finger is already down
 
@@ -241,15 +243,25 @@ const PlayerMap = React.forwardRef(function PlayerMap({ ps, playerId, canMove, p
   );
 });
 
+// While your own hero is dragged, the others see it move (the server checks you may move it before passing it on).
+const liveSender = createLiveSender(sendPlayerTokenLive);
+
 const PlayerToken = React.memo(function PlayerToken({ token, gridSize, mine, draggable, snap, turn, hp, onMoved }) {
   const [dragging, setDragging] = useState(false);
+  const group = useRef(null);
+  const latest = useRef(token);
+  latest.current = token;
+  const home = useCallback(() => ({ x: latest.current.x, y: latest.current.y }), []);
+  useTokenLive(token.id, group, home); // somebody else's hero, or the GM moving one, follows the live feed
   return (
-    <Group x={token.x} y={token.y} listening={draggable} draggable={draggable} opacity={dragging ? 0.8 : 1}
+    <Group ref={group} x={token.x} y={token.y} listening={draggable} draggable={draggable} opacity={dragging ? 0.8 : 1}
       onDragStart={() => setDragging(true)}
+      onDragMove={event => { if (draggable) liveSender.move(token.id, event.target.x(), event.target.y()); }}
       onDragEnd={event => {
         setDragging(false);
         let x = event.target.x(), y = event.target.y();
         if (snap) { x = snapTo(x, gridSize); y = snapTo(y, gridSize); event.target.position({ x, y }); }
+        if (draggable) liveSender.end(token.id, x, y);
         onMoved(token.id, x, y);
       }}
       onMouseEnter={event => { if (draggable) event.target.getStage().container().style.cursor = 'grab'; }}

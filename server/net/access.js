@@ -83,6 +83,16 @@ export function createAccess(options = {}) {
   const table = {
     mode: () => store.data.mode,
     locked: () => store.data.mode === 'locked',
+    /** Does a new device need the QR link or the typed code? Off by default: opening the address is enough. */
+    codeRequired: () => store.data.codeRequired === true,
+    setCodeRequired(required) {
+      const next = required === true;
+      if (store.data.codeRequired === next) return true;
+      store.data.codeRequired = next;
+      store.save();
+      fire('change', { kind: 'entry', codeRequired: next });
+      return true;
+    },
     setMode(mode) {
       if (!ADMISSION_MODES.has(mode)) return false;
       if (mode === 'locked') { table.lock(); return true; }
@@ -137,7 +147,7 @@ export function createAccess(options = {}) {
     /** The GM is looking at the invite (dialog open): the typed code is accepted for 10 more minutes. */
     inviteShown() { invite.markShown(); },
     /** The `TABLE` message body for the GM. */
-    view: () => ({ mode: store.data.mode, locked: table.locked(), code: displayCode(invite.current().code), codeFresh: invite.codeFresh() }),
+    view: () => ({ mode: store.data.mode, locked: table.locked(), codeRequired: table.codeRequired(), code: displayCode(invite.current().code), codeFresh: invite.codeFresh() }),
     on(event, listener) {
       if (!listeners[event]) throw new RangeError(`table.on: unknown event "${event}"`);
       listeners[event].add(listener);

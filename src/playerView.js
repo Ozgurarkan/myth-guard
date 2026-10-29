@@ -36,8 +36,10 @@ export function projectForPlayers(scene) {
   const tokens = Array.isArray(scene.tokens) ? scene.tokens : [];
   const gridSize = scene.gridSize || 50;
   const fogOn = scene.showFog !== false;
-  const fogCells = fogOn && Array.isArray(scene.fogCells) ? scene.fogCells : [];
-  const fog = new Set(fogCells);
+  // Fog squares are a set: players' copies are patched as one, so a repeated square would make their checksum disagree
+  // with the server's and trigger a resync again and again. The GM screen never produces one; this keeps it that way.
+  const fog = new Set(fogOn && Array.isArray(scene.fogCells) ? scene.fogCells : []);
+  const fogCells = [...fog];
 
   const visibleTokens = tokens
     .filter(token => token.visibleToPlayers !== false && !tokenUnderFog(token, fog, gridSize))

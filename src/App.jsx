@@ -9,6 +9,7 @@ import SheetViewer from './modals/SheetViewer';
 import { subscribeGM, sendGmMessage } from './broadcast';
 import { withGmAudio } from './audio/audioChannel';
 import { emitPing } from './pings';
+import { emitTokenLive } from './liveTokens';
 import { AudioProvider } from './audio/AudioProvider';
 import { ToastHost, ConfirmHost, toast } from './ui';
 import { WorkspaceCtx } from './gm/workspace';
@@ -49,6 +50,7 @@ function Inner() {
       onAssetError: message => toast(message, { tone: 'warning', duration: 7000 }),
       onTokenMove: (id, x, y) => dispatch({ type: 'TOKEN_MOVE', id, x, y }),
       onPing: emitPing,
+      onTokenLive: emitTokenLive,
       // The server already checked it is that hero's turn; this window has the final say, because it owns the order.
       onEndTurn: ({ playerId, tokenId }) => {
         const current = latest.current;
@@ -93,10 +95,10 @@ function Inner() {
       <a className="skip-link" href="#battle-map" onClick={event => { event.preventDefault(); document.getElementById('battle-map')?.focus({ preventScroll: true }); }}>Skip to the battle map</a>
       <div className={classes} style={docked ? { '--sheet-w': `${state.sheetDockWidth}px` } : undefined}>
         <Header />
-        <Toolbar />
         <main className="canvas-area" id="battle-map" tabIndex={-1} ref={canvasRef} aria-label="Battle map">
           <MapStage containerRef={canvasRef} />
           <CanvasOverlays />
+          <Toolbar />
         </main>
         {state.showSheets && <SheetViewer />}
         {panelOpen && <Sidebar />}

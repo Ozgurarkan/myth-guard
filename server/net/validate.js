@@ -96,6 +96,10 @@ const VALIDATORS = {
     if (aid !== undefined) out.aid = aid;
     return out;
   },
+  PLAYER_TOKEN_LIVE(m) {
+    if (!isId(m.id) || !coord(m.x) || !coord(m.y)) return null;
+    return { type: 'PLAYER_TOKEN_LIVE', id: m.id, x: m.x, y: m.y };
+  },
   PLAYER_END_TURN(m) {
     const aid = aidOf(m.aid);
     if (aid === BAD || !isId(m.tokenId)) return null;
@@ -137,12 +141,20 @@ const VALIDATORS = {
     }
     return { type: 'SCENE', scene };
   },
+  GM_TOKEN_LIVE(m) {
+    if (!isId(m.id) || !coord(m.x) || !coord(m.y)) return null;
+    return { type: 'GM_TOKEN_LIVE', id: m.id, x: m.x, y: m.y };
+  },
   TABLE_CMD(m) {
     if (!TABLE_OPS.has(m.op)) return null;
     const out = { type: 'TABLE_CMD', op: m.op };
     if (m.device !== undefined) {
       if (!deviceRef(m.device)) return null;
       out.device = m.device;
+    }
+    if (m.op === 'entry') {
+      if (typeof m.required !== 'boolean') return null;
+      out.required = m.required;
     }
     if (m.op === 'mode') {
       if (!ADMISSION_MODES.has(m.mode)) return null;

@@ -67,7 +67,7 @@ test('the four message Sets are frozen: add, delete and clear throw and change n
 
 test('catalogue: every v2 type the app uses today is present in the right direction', () => {
   // read from src/broadcast.js and server/sessionSync.js
-  for (const type of ['PLAYER_NAME', 'PLAYER_TOKEN_MOVE', 'PLAYER_PING', 'PLAYER_END_TURN', 'REQUEST_FULL_STATE', 'RESYNC', 'PING']) {
+  for (const type of ['PLAYER_NAME', 'PLAYER_TOKEN_MOVE', 'PLAYER_TOKEN_LIVE', 'PLAYER_PING', 'PLAYER_END_TURN', 'REQUEST_FULL_STATE', 'RESYNC', 'PING']) {
     assert.ok(PLAYER_TYPES.has(type), `player -> server ${type}`);
   }
   for (const type of ['SCENE', 'PING']) assert.ok(GM_TYPES.has(type), `GM -> server ${type}`);
@@ -92,7 +92,7 @@ test('catalogue: every type named in design 4.6 is present', () => {
 
 test('catalogue: sets are disjoint where they must be', () => {
   // A player must never be able to send a GM-only command, or pretend to be the server.
-  for (const type of ['SCENE', 'TABLE_CMD', 'AUDIO_OFFER', 'AUDIO_SELECT', 'AUDIO_CONTROLS', 'AUDIO_STATUS', 'AUDIO_FALLBACK', 'AUDIO_STOP']) {
+  for (const type of ['SCENE', 'TABLE_CMD', 'GM_TOKEN_LIVE', 'AUDIO_OFFER', 'AUDIO_SELECT', 'AUDIO_CONTROLS', 'AUDIO_STATUS', 'AUDIO_FALLBACK', 'AUDIO_STOP']) {
     assert.equal(PLAYER_TYPES.has(type), false, `player may not send ${type}`);
   }
   for (const type of ['PLAYER_NAME', 'PLAYER_TOKEN_MOVE', 'PLAYER_PING', 'PLAYER_END_TURN', 'RESYNC', 'REQUEST_FULL_STATE', 'AUDIO_LISTEN', 'AUDIO_ANSWER', 'AUDIO_STATS']) {
@@ -103,7 +103,7 @@ test('catalogue: sets are disjoint where they must be', () => {
     assert.equal(GM_TYPES.has(type), false, `GM may not send server message ${type}`);
   }
   assert.deepEqual(overlap(PLAYER_TYPES, GM_TYPES), ['PING', 'RESUME'], 'the only types both clients send');
-  assert.deepEqual(overlap(SERVER_TO_PLAYER, SERVER_TO_GM), ['HELLO', 'MAP_PING', 'PONG'], 'the only types the server sends to both');
+  assert.deepEqual(overlap(SERVER_TO_PLAYER, SERVER_TO_GM), ['HELLO', 'MAP_PING', 'PONG', 'TOKEN_LIVE'], 'the only types the server sends to both');
   // Player-only server messages never reach the GM and vice versa.
   for (const type of ['STATE_FULL', 'STATE_PATCH', 'KICKED', 'WAIT', 'ADMITTED', 'DENIED', 'TABLE_LOCKED', 'ACK']) assert.equal(SERVER_TO_GM.has(type), false, type);
   for (const type of ['PLAYER_ROSTER', 'JOIN_REQUEST', 'TABLE', 'AUDIO_LISTENER']) assert.equal(SERVER_TO_PLAYER.has(type), false, type);

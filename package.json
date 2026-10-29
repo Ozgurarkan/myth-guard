@@ -22,7 +22,10 @@
     "test": "node --test",
     "check:browser": "node scripts/check-player-browser.mjs",
     "accept": "node scripts/accept-net.mjs",
-    "check:eol": "node scripts/check-eol.mjs"
+    "check:eol": "node scripts/check-eol.mjs",
+    "stress": "node scripts/stress-combat.mjs",
+    "stress:wifi": "node scripts/stress-combat.mjs --wifi",
+    "fps": "node scripts/fps-check.mjs"
   },
   "dependencies": {
     "@capacitor/app": "^8.1.2",

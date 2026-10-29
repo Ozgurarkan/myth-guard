@@ -43,7 +43,7 @@ export async function buildScene(state, assets) {
   return scene;
 }
 
-const TABLE_FIELDS = ['device', 'mode', 'name'];
+const TABLE_FIELDS = ['device', 'mode', 'name', 'required'];
 
 /**
  * Handlers (set with `setHandlers`, all optional):
@@ -86,6 +86,7 @@ export function createGMLink({
       if (message.type === 'REQUEST_FULL_STATE') schedule(0);
       else if (message.type === 'PLAYER_ROSTER') handlers.onRoster?.(message.players);
       else if (message.type === 'MAP_PING') handlers.onPing?.(message);
+      else if (message.type === 'TOKEN_LIVE') handlers.onTokenLive?.(message);
       else if (message.type === 'PLAYER_END_TURN') handlers.onEndTurn?.(message);
       else if (message.type === 'JOIN_REQUEST') handlers.onJoinRequest?.(message);
       else if (message.type === 'TABLE') { table = message; handlers.onTable?.(message); }

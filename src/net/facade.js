@@ -112,6 +112,16 @@ export function sendPlayerTokenMove(id, x, y) {
   return playerLink?.sendMove(id, x, y) ?? false;
 }
 
+/** A hero being dragged: the others see it move while the hand is still down. Fire and forget. */
+export function sendPlayerTokenLive(id, x, y) {
+  return playerLink?.sendLive(id, x, y) ?? false;
+}
+
+/** GM: any token being dragged. The server passes it on only if the players may see that token. */
+export function sendGmTokenLive(id, x, y) {
+  return gmLink?.send({ type: 'GM_TOKEN_LIVE', id, x, y }) ?? false;
+}
+
 /** A "look here" at a map point. Everyone at the table sees it for a few seconds. */
 export function sendPlayerPing(x, y) {
   return playerLink?.sendPing(x, y) ?? false;

@@ -169,7 +169,7 @@ export function SessionDialog({ onClose }) {
                 <Button size="sm" icon={copied === 'link' ? 'check' : 'link'} onClick={() => copy(joinUrl, 'link', 'Invite link copied. Send it only to your players.')}>{copied === 'link' ? 'Copied' : 'Copy invite link'}</Button>
                 <Button size="sm" variant="ghost" icon="refresh-cw" onClick={rotate}>New invite</Button>
               </div>
-              <p className="session__note">The QR code contains a secret that lets a phone in. Show it to the people at your table, not to the internet.</p>
+              <p className="session__note">No code is needed: players on your Wi-Fi can simply open the address above. If you would rather keep the table private, turn on “Players need the QR code or table code” in the Table tab, or set the mode below to ask first. Never show the QR code to the internet.</p>
               {addresses.length > 1 && (
                 <label className="session__alt">
                   <span>Not working? Try another network:</span>
@@ -192,7 +192,7 @@ export function SessionDialog({ onClose }) {
           <h3 className="session__heading"><Icon name="users" size={16} /> At the table
             {pendingCount > 0 && <Badge tone="warning">{pendingCount} waiting</Badge>}
             <Badge tone={onlineCount ? 'success' : 'neutral'}>{onlineCount} online</Badge></h3>
-          {people.length === 0 && <p className="session__hint">Nobody has joined yet. Players scan the code or type the table code, enter their name, and appear here.</p>}
+          {people.length === 0 && <p className="session__hint">Nobody has joined yet. Players open the address (or scan the code), enter their name, and appear here.</p>}
           <div className="rows">
             {sorted.map(player => <DeviceRow key={player.deviceId ?? player.id} player={player} />)}
           </div>

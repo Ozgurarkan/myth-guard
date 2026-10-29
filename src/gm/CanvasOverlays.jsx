@@ -2,6 +2,7 @@
 // selection actions and the "sharing a handout" banner.
 import React, { useState } from 'react';
 import { LogoSeal } from '../brand';
+import { useStage } from '../stageView';
 import { Icon, Button, IconButton, Avatar, Badge } from '../ui';
 import { useGM, nanoid } from '../store';
 import { useWorkspace } from './workspace';
@@ -105,11 +106,11 @@ function SelectionBar() {
 }
 
 function ZoomControls() {
-  const { state } = useGM();
+  const { scale: stageScale } = useStage();
   return (
     <div className="zoom" role="group" aria-label="Map zoom">
       <IconButton icon="minus" label="Zoom out" size="sm" variant="ghost" onClick={() => view({ zoom: 1 / 1.25 })} />
-      <button type="button" className="zoom__value" title="Reset to 100%" onClick={() => view({ reset: true })}>{Math.round(state.stageScale * 100)}%</button>
+      <button type="button" className="zoom__value" title="Reset to 100%" onClick={() => view({ reset: true })}>{Math.round(stageScale * 100)}%</button>
       <IconButton icon="plus" label="Zoom in" size="sm" variant="ghost" onClick={() => view({ zoom: 1.25 })} />
       <IconButton icon="expand" label="Fit the whole map on screen" size="sm" variant="ghost" onClick={() => view({ fit: true })} />
     </div>

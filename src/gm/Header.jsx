@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Icon, Button, ButtonLink, IconButton, toast } from '../ui';
+import { Icon, Button, IconButton, toast } from '../ui';
+import { openPlayerView } from './openPlayerView';
 import { useGM, hasUnsavedChanges, sceneHasContent } from '../store';
 import { useWorkspace } from './workspace';
 import { useAudio } from '../audio/AudioProvider';
@@ -81,9 +82,7 @@ export function Header() {
           <input className="visually-hidden-input" aria-label="Import battle map" type="file" accept="image/*" onChange={handleImport} disabled={busy} />
         </label>
         <Button variant="primary" icon="save" onClick={quickSave} title={dirty ? 'Save this scene — you have unsaved changes (Ctrl+S)' : 'Save this scene (Ctrl+S)'} className={dirty ? 'has-dot' : undefined}>Save</Button>
-        <ButtonLink icon="external-link" href="/player.html" target="_blank" rel="noopener" title="See exactly what your players see">
-          Player view
-        </ButtonLink>
+        <Button variant="secondary" icon="external-link" onClick={() => openPlayerView()} title="See exactly what your players see (opens already joined)">Player view</Button>
         <IconButton icon="keyboard" label="Keyboard shortcuts (?)" onClick={() => setShortcutsOpen(true)} />
       </div>
     </header>

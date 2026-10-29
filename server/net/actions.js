@@ -10,6 +10,7 @@
 // refusals, clamped to the map, a 700 ms ping cooldown, end-turn only for the active hero, a 1.5 s double-tap guard.
 // `memory` is the per-device scratch space the caller keeps between calls ({ lastPing, lastEndTurn }).
 import { canPlayerMoveToken } from '../../src/ownership.js';
+import { tokenUnderFog } from '../../src/playerView.js';
 
 export const PING_COOLDOWN_MS = 700;
 export const END_TURN_GUARD_MS = 1500;
@@ -72,4 +73,47 @@ export function endTurn({ scene, actor, msg, gmPresent, memory, now }) {
   if (last?.id === token.id && now - last.at < END_TURN_GUARD_MS) return { ack: ok() };
   memory.lastEndTurn = { id: token.id, at: now };
   return { ack: ok(), toGm: { type: 'PLAYER_END_TURN', playerId: actor.playerId, tokenId: token.id, name: token.name || '' } };
+}
+
+// ── A token that is being dragged right now ──────────────────────────────────────────────────────────────────────
+// Live positions are shown to the others while a hand is still on the token. They are never stored: the scene only changes
+// when the drop arrives as a normal move. The same privacy rule as the scene projection applies to every single frame:
+// a hidden token, or one standing under fog, is not announced, so a player cannot learn where it is by watching the wire.
+
+const fogSets = new WeakMap(); // fogCells array -> Set. The GM replaces the whole array when fog changes, so identity is a safe key.
+const NO_FOG = new Set();
+function fogOf(scene) {
+  if (scene.showFog === false || !Array.isArray(scene.fogCells) || !scene.fogCells.length) return NO_FOG;
+  let set = fogSets.get(scene.fogCells);
+  if (!set) { set = new Set(scene.fogCells); fogSets.set(scene.fogCells, set); }
+  return set;
+}
+
+/** The frame to pass on, or null to drop it. `byPlayer` is the sender's playerId, or null when the GM is dragging. */
+function liveFrame({ scene, msg, byPlayer, gmPresent }) {
+  if (!scene || typeof msg?.id !== 'string' || !Number.isFinite(msg.x) || !Number.isFinite(msg.y)) return null;
+  const token = findToken(scene, msg.id);
+  if (!token || token.visibleToPlayers === false) return null;
+  const gridSize = scene.gridSize || 50;
+  const fog = fogOf(scene);
+  if (byPlayer !== null) {
+    if (!gmPresent || scene.playerCanMoveTokens === false || token.ownerId !== byPlayer) return null;
+    if (tokenUnderFog(token, fog, gridSize)) return null; // it could not be moved from there
+  }
+  const x = onMap(msg.x, scene.mapWidth);
+  const y = onMap(msg.y, scene.mapHeight);
+  if (tokenUnderFog({ x, y, gridSize: token.gridSize }, fog, gridSize)) return null; // dragged into fog: it vanishes from the players' view on the drop
+  return { type: 'TOKEN_LIVE', id: token.id, x, y };
+}
+
+/** A player is dragging their own hero. Everyone else, and the GM, may watch. */
+export function playerLiveMove({ scene, actor, msg, gmPresent }) {
+  if (!actor?.playerId) return null;
+  const frame = liveFrame({ scene, msg, byPlayer: actor.playerId, gmPresent });
+  return frame && { ...frame, playerId: actor.playerId };
+}
+
+/** The GM is dragging any token. Only a token the players can see is announced. */
+export function gmLiveMove({ scene, msg }) {
+  return liveFrame({ scene, msg, byPlayer: null, gmPresent: true });
 }

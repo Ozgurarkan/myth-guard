@@ -54,9 +54,10 @@ export async function launch({ args = [], executablePath = findEdge() } = {}) {
   let port = 0;
   for (let i = 0; i < 150 && !port; i += 1) {
     try { port = Number((await readFile(join(profile, 'DevToolsActivePort'), 'utf8')).split('\n')[0]); } catch { await sleep(100); }
-    if (exited) throw new Error('Edge exited during start-up');
   }
-  if (!port) { child.kill(); throw new Error('Edge did not open its DevTools port'); }
+  // Newer Edge builds start the real browser and let the launcher process exit at once, so the launcher's exit is not an error:
+  // what matters is whether the browser opened its DevTools port.
+  if (!port) { child.kill(); throw new Error(`Edge did not open its DevTools port${exited ? ' (the launcher exited)' : ''}`); }
   const info = await (await fetch(`http://127.0.0.1:${port}/json/version`)).json();
   const socket = new WebSocket(info.webSocketDebuggerUrl, { perMessageDeflate: false });
   await new Promise((resolve, reject) => { socket.once('open', resolve); socket.once('error', reject); });

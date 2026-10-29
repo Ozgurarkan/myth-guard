@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { Button, IconButton, Input, Select, Textarea, Field, Badge, Avatar, EmptyState, Icon, ask, toast } from '../../ui';
 import { dbListLibrary, dbSaveLibrary, dbDeleteLibrary } from '../../db';
 import { useGM, nanoid } from '../../store';
+import { getStage } from '../../stageView';
 import { SearchField } from './PanelParts';
 import { readFileAsDataURL, getImageSize } from '../../utils';
 
@@ -59,8 +60,9 @@ export function LibraryPanel({ kind }) {
 
   const place = npc => {
     const canvas = document.querySelector('.canvas-area');
-    const x = ((canvas?.clientWidth || 800) / 2 - state.stageX) / state.stageScale;
-    const y = ((canvas?.clientHeight || 600) / 2 - state.stageY) / state.stageScale;
+    const view = getStage();
+    const x = ((canvas?.clientWidth || 800) / 2 - view.x) / view.scale;
+    const y = ((canvas?.clientHeight || 600) / 2 - view.y) / view.scale;
     const snap = state.snapToGrid ? state.gridSize : 1;
     dispatch({ type: 'TOKEN_ADD', token: { id: nanoid(), name: npc.name, imageSrc: npc.imageSrc, characterType: 'npc', npcId: npc.id,
       ownerId: null, gridSize: 1, borderWidth: 4, color: '#a58bff', visibleToPlayers: false,
