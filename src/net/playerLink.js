@@ -45,7 +45,7 @@ const RETRY_MS = { locked: 15000, full: 15000, rate: 15000, banned: 60000, netwo
  * unauthorized needs-invite rogue-server.
  */
 export function createPlayerLink({
-  onState, onConnection, onGm, onIdentity, onLatency, onMoveRejected, onPing, onTokenLive, onTurnRejected,
+  onState, onConnection, onGm, onIdentity, onLatency, onMoveRejected, onPing, onTokenLive, onTurnRejected, onEditRejected, onAreaRejected,
   onKicked, onLocked, onWaiting, onNetStats, onAudio, onJoinError,
   createTransport = createConnection, transportOptions = {}, readName = () => '',
   store = deviceStore, join, clock = transportOptions.clock ?? createSystemClock(), verifySum = true,
@@ -175,7 +175,9 @@ export function createPlayerLink({
       case 'ACK':
         if (message.ok === false && info.action) {
           if (info.action.type === 'PLAYER_TOKEN_MOVE') onMoveRejected?.({ id: info.action.id, reason: message.reason });
-          else if (info.action.type === 'PLAYER_END_TURN') onTurnRejected?.({ reason: message.reason });
+          else if (info.action.type === 'PLAYER_END_TURN' || info.action.type === 'PLAYER_DELAY_TURN') onTurnRejected?.({ reason: message.reason });
+          else if (info.action.type === 'PLAYER_COMBAT_EDIT') onEditRejected?.({ id: info.action.tokenId, reason: message.reason });
+          else if (info.action.type === 'PLAYER_AREA_ADD' || info.action.type === 'PLAYER_AREA_REMOVE') onAreaRejected?.({ reason: message.reason });
         }
         break;
       case 'MAP_PING': onPing?.(message); break;
@@ -223,6 +225,14 @@ export function createPlayerLink({
     sendPing: (x, y) => act({ type: 'PLAYER_PING', x, y }, false),
     /** A hero being dragged; not acknowledged, not resent. */
     sendLive: (id, x, y) => act({ type: 'PLAYER_TOKEN_LIVE', id, x, y }, false),
+    /** Change your hero's hit points and/or initiative: `fields` is { hp?, maxHp?, initiative? }. */
+    sendCombatEdit: (tokenId, fields) => act({ type: 'PLAYER_COMBAT_EDIT', tokenId, ...fields }, true),
+    /** Wait until after another combatant this round: `after` is that combatant's token id. */
+    sendDelayTurn: (tokenId, after) => act({ type: 'PLAYER_DELAY_TURN', tokenId, after }, true),
+    /** Cast a spell area, or a circle bound to one of your heroes: `fields` is { id, shape, color, x, y, radius | width + height, angle?, rotation?, boundTo? }. */
+    sendAreaAdd: fields => act({ type: 'PLAYER_AREA_ADD', ...fields }, true),
+    /** Take back one of your own areas (`{ id }`) or all of them (`{ all: true }`). */
+    sendAreaRemove: fields => act({ type: 'PLAYER_AREA_REMOVE', ...fields }, true),
     sendEndTurn: tokenId => act({ type: 'PLAYER_END_TURN', tokenId }, true),
     setName: name => act({ type: 'PLAYER_NAME', name }, false),
     /** Pass-through for the audio package (AUDIO_LISTEN, AUDIO_ANSWER, AUDIO_STATS). */

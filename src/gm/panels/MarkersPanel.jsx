@@ -36,7 +36,7 @@ export function MarkersPanel() {
       </PanelSection>
 
       <PanelSection title="On the map" count={state.markers.length}>
-      {state.markers.length === 0 && <EmptyState icon="map-pin" title="No markers">Mark a trap, a secret door or a place worth remembering. Markers start visible to players.</EmptyState>}
+      {state.markers.length === 0 && <EmptyState icon="map-pin" title="No markers" />}
       <div className="rows">
         {state.markers.map(marker => {
           const type = MARKER_TYPES.find(item => item.value === marker.type);

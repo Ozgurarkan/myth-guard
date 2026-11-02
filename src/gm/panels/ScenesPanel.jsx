@@ -77,7 +77,7 @@ export function ScenesPanel() {
 
       <PanelSection title="Saved scenes" count={scenes.length}>
         {scenes.length > 3 && <SearchField label="Search saved scenes" placeholder="Search scenes…" value={search} onChange={event => setSearch(event.target.value)} />}
-        {scenes.length === 0 && <EmptyState icon="map" art="scroll" title="No scenes yet">Name this scene above and save it. It will be waiting for you next session.</EmptyState>}
+        {scenes.length === 0 && <EmptyState icon="map" art="scroll" title="No scenes yet" />}
         {scenes.length > 0 && shown.length === 0 && <EmptyState icon="search">No scene matches “{search}”.</EmptyState>}
 
         <div className="scene-grid">

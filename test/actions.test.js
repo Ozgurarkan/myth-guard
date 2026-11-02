@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { moveToken, mapPing, endTurn, createMemory, PING_COOLDOWN_MS, END_TURN_GUARD_MS } from '../server/net/actions.js';
+import { moveToken, mapPing, endTurn, editCombat, delayTurn, addArea, removeArea, createMemory, PING_COOLDOWN_MS, END_TURN_GUARD_MS } from '../server/net/actions.js';
 import { ACK_REASONS } from '../src/net/protocol.js';
 
 const alice = { playerId: 'alice', name: 'Aria', label: 'Chrome · Android' };
@@ -117,4 +117,158 @@ test('a scene with junk in it does not make a rule throw', () => {
   assert.doesNotThrow(() => moveToken({ scene: junk, actor: alice, msg: { id: 'hero', x: 1, y: 1 }, gmPresent: true }));
   assert.doesNotThrow(() => endTurn({ scene: junk, actor: alice, msg: { tokenId: 'hero' }, gmPresent: true, memory: createMemory(), now: 1 }));
   assert.doesNotThrow(() => mapPing({ scene: junk, actor: alice, msg: { x: 1, y: 1 }, memory: createMemory(), now: 1 }));
+});
+
+const fight = (extra = {}) => scene({ combat: { entries: [{ tokenId: 'hero', initiative: 12, hp: 18, maxHp: 20 }, { tokenId: 'npc', initiative: 9, hp: 7, maxHp: 7 }], activeId: 'hero', round: 1 }, ...extra });
+const edit = (msg, overrides = {}) => editCombat({ scene: fight(), actor: alice, msg: { tokenId: 'hero', ...msg }, gmPresent: true, ...overrides });
+
+test('a player changes their own hero in a fight: numbers are clamped, the GM hears of it and the server copy follows', () => {
+  const result = edit({ hp: 12, initiative: 15 });
+  assert.deepEqual(result.ack, { ok: true });
+  assert.deepEqual(result.toGm, { type: 'PLAYER_COMBAT_EDIT', playerId: 'alice', tokenId: 'hero', hp: 12, initiative: 15 });
+  const copy = fight();
+  result.mutate(copy);
+  assert.deepEqual(copy.combat.entries[0], { tokenId: 'hero', initiative: 15, hp: 12, maxHp: 20 });
+  assert.equal(edit({ hp: 500 }).toGm.hp, 20, 'never above the maximum');
+  assert.equal(edit({ hp: -5 }).toGm.hp, 0);
+  assert.equal(edit({ initiative: 1000 }).toGm.initiative, 99);
+  assert.equal(edit({ initiative: 7.6 }).toGm.initiative, 8);
+});
+
+test('editing a hero is refused for other people, hidden or absent heroes, a paused table and nonsense', () => {
+  assert.equal(edit({ hp: 1 }, { actor: bob }).ack.reason, 'blocked', 'not your hero');
+  assert.equal(editCombat({ scene: fight(), actor: alice, msg: { tokenId: 'npc', hp: 1 }, gmPresent: true }).ack.reason, 'blocked', 'a token nobody gave you');
+  assert.equal(editCombat({ scene: fight(), actor: alice, msg: { tokenId: 'ghost', hp: 1 }, gmPresent: true }).ack.reason, 'blocked', 'hidden');
+  assert.equal(edit({ hp: 1 }, { gmPresent: false }).ack.reason, 'away');
+  assert.equal(editCombat({ scene: fight({ playerCanEditCombat: false }), actor: alice, msg: { tokenId: 'hero', hp: 1 }, gmPresent: true }).ack.reason, 'paused');
+  assert.equal(editCombat({ scene: scene({ combat: { entries: [], activeId: null, round: 1 } }), actor: alice, msg: { tokenId: 'hero', hp: 1 }, gmPresent: true }).ack.reason, 'blocked', 'not in a fight');
+  for (const msg of [{ hp: NaN }, { initiative: Infinity }, {}, { tokenId: 5, hp: 1 }]) assert.equal(edit(msg).ack.reason, 'invalid', JSON.stringify(msg));
+});
+
+test('a player may change the maximum of their own hero, never of a creature they were given', () => {
+  const grow = edit({ maxHp: 30 });
+  assert.deepEqual(grow.toGm, { type: 'PLAYER_COMBAT_EDIT', playerId: 'alice', tokenId: 'hero', maxHp: 30, hp: 18 }, 'hit points stay as they were');
+  const shrink = edit({ maxHp: 10 });
+  assert.deepEqual([shrink.toGm.maxHp, shrink.toGm.hp], [10, 10], 'cut down to fit the new maximum');
+  assert.equal(edit({ maxHp: 0 }).toGm.maxHp, 1);
+  assert.equal(edit({ maxHp: 1e9 }).toGm.maxHp, 99999);
+  assert.deepEqual([edit({ maxHp: 25, hp: 99 }).toGm.maxHp, edit({ maxHp: 25, hp: 99 }).toGm.hp], [25, 25], 'the new maximum is the ceiling for the same message');
+  const copy = fight();
+  grow.mutate(copy);
+  assert.deepEqual(copy.combat.entries[0], { tokenId: 'hero', initiative: 12, hp: 18, maxHp: 30 });
+  const bare = scene({ combat: { entries: [{ tokenId: 'hero', initiative: 12, hp: null, maxHp: null }], activeId: null, round: 1 } });
+  assert.deepEqual(editCombat({ scene: bare, actor: alice, msg: { tokenId: 'hero', maxHp: 22 }, gmPresent: true }).toGm.hp, 22, 'a hero with no hit points starts full');
+  const creature = scene({ tokens: [{ id: 'hero', x: 0, y: 0, gridSize: 1, ownerId: 'alice', visibleToPlayers: true, characterType: 'npc' }], combat: { entries: [{ tokenId: 'hero', initiative: 3, hp: 7, maxHp: 7 }], activeId: null, round: 1 } });
+  assert.equal(editCombat({ scene: creature, actor: alice, msg: { tokenId: 'hero', maxHp: 900, hp: 1 }, gmPresent: true }).ack.reason, 'invalid', 'a creature keeps its numbers');
+  assert.equal(editCombat({ scene: creature, actor: alice, msg: { tokenId: 'hero', initiative: 4, hp: 1 }, gmPresent: true }).toGm.initiative, 4);
+  assert.equal(edit({ maxHp: NaN }).ack.reason, 'invalid');
+});
+
+const queue = (extra = {}) => scene({
+  tokens: [
+    { id: 'hero', name: 'Aria', x: 0, y: 0, gridSize: 1, ownerId: 'alice', visibleToPlayers: true, characterType: 'pc' },
+    { id: 'orc', name: 'Orc', x: 100, y: 0, gridSize: 1, visibleToPlayers: true, characterType: 'npc' },
+    { id: 'lurker', name: 'Lurker', x: 200, y: 0, gridSize: 1, visibleToPlayers: false, characterType: 'npc' },
+    { id: 'drow', name: 'Drow', x: 300, y: 0, gridSize: 1, visibleToPlayers: true, characterType: 'npc' },
+    { id: 'friend', name: 'Bran', x: 400, y: 0, gridSize: 1, ownerId: 'bob', visibleToPlayers: true, characterType: 'pc' },
+  ],
+  combat: { entries: [
+    { tokenId: 'hero', initiative: 20, hp: 10, maxHp: 10 }, { tokenId: 'orc', initiative: 15 }, { tokenId: 'lurker', initiative: 12 }, { tokenId: 'drow', initiative: 5 }, { tokenId: 'friend', initiative: 3, hp: 9, maxHp: 9 },
+  ], activeId: 'hero', round: 1 },
+  ...extra,
+});
+const wait = (msg, overrides = {}) => delayTurn({ scene: queue(), actor: alice, msg: { tokenId: 'hero', after: 'orc', ...msg }, gmPresent: true, ...overrides });
+
+test('a hero delays their turn until after another hero who comes later: the GM hears of it and the server copy follows', () => {
+  const result = wait({ after: 'friend' });
+  assert.deepEqual(result.ack, { ok: true });
+  assert.deepEqual(result.toGm, { type: 'PLAYER_DELAY_TURN', playerId: 'alice', tokenId: 'hero', after: 'friend' });
+  const copy = queue();
+  result.mutate(copy);
+  assert.equal(copy.combat.activeId, 'orc', 'the turn passes on at once');
+  assert.deepEqual(copy.combat.delays, [{ tokenId: 'hero', after: 'friend' }]);
+});
+
+test('delaying is refused off turn, behind a creature, to a hidden hero, to someone already gone, twice, or by another player', () => {
+  assert.equal(wait({ after: 'friend' }, { actor: bob }).ack.reason, 'blocked');
+  assert.equal(wait({ after: 'orc' }).ack.reason, 'blocked', 'a hero never waits for a creature');
+  assert.equal(wait({ after: 'drow' }).ack.reason, 'blocked', 'not even a visible one');
+  assert.equal(wait({ after: 'lurker' }).ack.reason, 'blocked', 'a hidden creature is never named');
+  assert.equal(wait({ after: 'hero' }).ack.reason, 'blocked');
+  assert.equal(wait({ after: 'nobody' }).ack.reason, 'blocked');
+  assert.equal(wait({ after: 'friend' }, { gmPresent: false }).ack.reason, 'away');
+  const offTurn = queue({ combat: { ...queue().combat, activeId: 'orc' } });
+  assert.equal(delayTurn({ scene: offTurn, actor: alice, msg: { tokenId: 'hero', after: 'friend' }, gmPresent: true }).ack.reason, 'not-your-turn');
+  const behind = queue({ combat: { ...queue().combat, activeId: 'hero', delays: [{ tokenId: 'hero', after: 'orc' }] } });
+  assert.equal(delayTurn({ scene: behind, actor: alice, msg: { tokenId: 'hero', after: 'friend' }, gmPresent: true }).ack.reason, 'blocked', 'once a round');
+  const fogged = queue({ showFog: true, fogCells: ['8,0'] });
+  assert.equal(delayTurn({ scene: fogged, actor: alice, msg: { tokenId: 'hero', after: 'friend' }, gmPresent: true }).ack.reason, 'blocked', 'under fog counts as hidden');
+  const hidden = queue({ tokens: queue().tokens.map(token => (token.id === 'friend' ? { ...token, visibleToPlayers: false } : token)) });
+  assert.equal(delayTurn({ scene: hidden, actor: alice, msg: { tokenId: 'hero', after: 'friend' }, gmPresent: true }).ack.reason, 'blocked', 'a hidden hero is never named');
+  for (const msg of [{ after: 5 }, { tokenId: 7 }, { tokenId: undefined }]) assert.equal(wait(msg).ack.reason, 'invalid', JSON.stringify(msg));
+});
+
+
+// ── Spell areas ──────────────────────────────────────────────────────────────────────────────────
+const castScene = (extra = {}) => scene({ areaEffects: [], ...extra });
+const cast = (msg = {}, overrides = {}) => addArea({ scene: castScene(), actor: alice, msg: { id: 'fx1', shape: 'circle', color: '#e5533d', x: 400, y: 300, radius: 100, ...msg }, gmPresent: true, ...overrides });
+
+test('a player casts a spell area: the GM hears of it and the server copy gets the effect at once', () => {
+  const result = cast();
+  assert.deepEqual(result.ack, { ok: true });
+  assert.deepEqual(result.toGm, { type: 'PLAYER_AREA_ADD', playerId: 'alice', id: 'fx1', shape: 'circle', color: '#e5533d', x: 400, y: 300, radius: 100 });
+  const copy = castScene();
+  result.mutate(copy);
+  assert.deepEqual(copy.areaEffects, [{ id: 'fx1', type: 'circle', x: 400, y: 300, radius: 100, color: '#e5533d', opacity: 0.4, ownerId: 'alice' }]);
+  const noList = scene();
+  assert.doesNotThrow(() => cast().mutate(noList));
+  assert.equal(noList.areaEffects.length, 1, 'a scene with no list yet gets one');
+});
+
+test('a circle bound to a hero follows no point: the server stores which token it is bound to', () => {
+  const result = cast({ id: 'aura', boundTo: 'hero', x: undefined, y: undefined });
+  assert.equal(result.ack.ok, true);
+  const copy = castScene();
+  result.mutate(copy);
+  assert.deepEqual([copy.areaEffects[0].boundTo, copy.areaEffects[0].x, copy.areaEffects[0].y], ['hero', 0, 0]);
+  cast({ id: 'aura2', boundTo: 'hero', radius: 200 }).mutate(copy);
+  assert.deepEqual(copy.areaEffects.map(effect => effect.id), ['aura2'], 'a hero wears one circle');
+});
+
+test('casting is refused with no GM, while the GM has it switched off, without a hero, onto someone else\'s or a hidden hero, or with nonsense', () => {
+  assert.equal(cast({}, { gmPresent: false }).ack.reason, 'away');
+  assert.equal(addArea({ scene: castScene({ playerCanCast: false }), actor: alice, msg: { id: 'fx1', shape: 'circle', color: '#e5533d', x: 1, y: 1, radius: 50 }, gmPresent: true }).ack.reason, 'paused');
+  assert.equal(cast({}, { actor: bob }).ack.reason, 'blocked', 'Bob has no hero on this map');
+  assert.equal(cast({ boundTo: 'npc' }).ack.reason, 'blocked', 'a creature is nobody\'s hero');
+  assert.equal(cast({ boundTo: 'ghost' }).ack.reason, 'blocked', 'a hidden hero');
+  assert.equal(addArea({ scene: null, actor: alice, msg: { id: 'fx1' }, gmPresent: true }).ack.reason, 'blocked');
+  assert.equal(addArea({ scene: castScene(), actor: { playerId: '' }, msg: { id: 'fx1' }, gmPresent: true }).ack.reason, 'blocked');
+  assert.equal(cast({ shape: 'star' }).ack.reason, 'invalid');
+  assert.equal(cast({ radius: undefined }).ack.reason, 'invalid');
+});
+
+test('taking back: only your own, one or all; allowed even while casting is switched off', () => {
+  const stocked = () => castScene({ areaEffects: [
+    { id: 'a1', type: 'circle', x: 0, y: 0, radius: 50, color: '#fff', ownerId: 'alice' }, { id: 'a2', type: 'circle', x: 0, y: 0, radius: 50, color: '#fff', ownerId: 'alice' },
+    { id: 'b1', type: 'circle', x: 0, y: 0, radius: 50, color: '#fff', ownerId: 'bob' }, { id: 'gm1', type: 'circle', x: 0, y: 0, radius: 50, color: '#fff' },
+  ] });
+  const take = (msg, overrides = {}) => removeArea({ scene: stocked(), actor: alice, msg, gmPresent: true, ...overrides });
+  const one = take({ id: 'a1' });
+  assert.deepEqual(one.ack, { ok: true });
+  assert.deepEqual(one.toGm, { type: 'PLAYER_AREA_REMOVE', playerId: 'alice', id: 'a1' });
+  const copy = stocked();
+  one.mutate(copy);
+  assert.deepEqual(copy.areaEffects.map(e => e.id), ['a2', 'b1', 'gm1']);
+  const all = take({ all: true });
+  assert.deepEqual(all.toGm, { type: 'PLAYER_AREA_REMOVE', playerId: 'alice', all: true });
+  const copy2 = stocked();
+  all.mutate(copy2);
+  assert.deepEqual(copy2.areaEffects.map(e => e.id), ['b1', 'gm1']);
+  assert.equal(take({ id: 'b1' }).ack.reason, 'blocked', 'Bob\'s');
+  assert.equal(take({ id: 'gm1' }).ack.reason, 'blocked', 'the GM\'s');
+  assert.equal(take({ id: 'nothing' }).ack.reason, 'blocked');
+  assert.equal(take({}).ack.reason, 'invalid');
+  assert.equal(take({ id: 'a1' }, { gmPresent: false }).ack.reason, 'away');
+  const paused = removeArea({ scene: { ...stocked(), playerCanCast: false }, actor: alice, msg: { id: 'a1' }, gmPresent: true });
+  assert.equal(paused.ack.ok, true);
 });

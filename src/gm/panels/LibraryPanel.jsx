@@ -119,10 +119,10 @@ export function LibraryPanel({ kind }) {
               <label className="check" key={n.id}>
                 <input type="checkbox" checked={draft.npcIds.includes(n.id)} onChange={e => set('npcIds', e.target.checked ? [...draft.npcIds, n.id] : draft.npcIds.filter(id => id !== n.id))} />
                 <span>{n.name}</span>
-              </label>))}</div> : <p className="field__hint">Create NPCs in the NPC library to link them here.</p>}
+              </label>))}</div> : null}
           </Field>
         </>}
-        <Field label="Private notes" hint="Only you ever see these."><Textarea rows={4} value={draft.notes} onChange={e => set('notes', e.target.value)} /></Field>
+        <Field label="Private notes"><Textarea rows={4} value={draft.notes} onChange={e => set('notes', e.target.value)} /></Field>
         <div className="button-row">
           <Button type="submit" variant="primary" icon="save" disabled={busy}>{busy ? 'Saving…' : `Save ${singular}`}</Button>
           <Button variant="ghost" disabled={busy} onClick={() => { setDraft(null); setError(''); }}>Cancel</Button>
@@ -135,7 +135,6 @@ export function LibraryPanel({ kind }) {
     <div>
       <div className="library-intro">
         <Badge tone="accent" icon="lock">Private to you</Badge>
-        <span>Players never see this notebook.</span>
       </div>
       {error && <p role="alert" className="form-error">{error}</p>}
       <Button variant="primary" block icon="plus" onClick={() => setDraft(npcMode ? freshNpc() : freshQuest())}>New {singular}</Button>
@@ -149,7 +148,7 @@ export function LibraryPanel({ kind }) {
       </div>
       <div className="panel-gap" />
       {loading && <p role="status" className="panel-note">Opening the library…</p>}
-      {!loading && !shown.length && <EmptyState icon={npcMode ? 'drama' : 'scroll-text'} art={records.length ? undefined : 'lantern'} title={records.length ? 'Nothing matches' : `No ${npcMode ? 'NPCs' : 'quests'} yet`}>{records.length ? 'Try a different search or filter.' : `Create your first ${singular} to start your notebook.`}</EmptyState>}
+      {!loading && !shown.length && <EmptyState icon={npcMode ? 'drama' : 'scroll-text'} art={records.length ? undefined : 'lantern'} title={records.length ? 'Nothing matches' : `No ${npcMode ? 'NPCs' : 'quests'} yet`} />}
       <div className="rows">
         {shown.map(record => (
           <article key={record.id} className="card record" data-tone={TONES[npcMode ? record.disposition : record.status]}>

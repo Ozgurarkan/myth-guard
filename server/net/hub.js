@@ -17,7 +17,7 @@ import { validateFrame } from './validate.js';
 import { createSession, timers, safeMetrics } from './session.js';
 import { createStateSync } from './stateSync.js';
 import { createRoster } from './roster.js';
-import { moveToken, mapPing, endTurn, createMemory, playerLiveMove, gmLiveMove } from './actions.js';
+import { moveToken, mapPing, endTurn, createMemory, playerLiveMove, gmLiveMove, editCombat, delayTurn, addArea, removeArea } from './actions.js';
 
 export const LEGACY_PATH = '/session-sync';
 export const LEGACY_MESSAGE = 'Myth Guard was updated. Reload this page.';
@@ -331,6 +331,18 @@ export function createHub({ access, metrics, clock, extensions = [], limits: lim
       }
       sendGm(frame);
       m.inc('live.relayed');
+    },
+    PLAYER_COMBAT_EDIT(s, msg) {
+      runAction(s, msg, { action: 'combat-edit', id: msg.tokenId }, () => editCombat({ scene: stateSync.scene, actor: s, msg, gmPresent: gmPresent() }));
+    },
+    PLAYER_DELAY_TURN(s, msg) {
+      runAction(s, msg, { action: 'delay-turn', id: msg.tokenId }, () => delayTurn({ scene: stateSync.scene, actor: s, msg, gmPresent: gmPresent() }));
+    },
+    PLAYER_AREA_ADD(s, msg) {
+      runAction(s, msg, { action: 'area-add', id: msg.id }, () => addArea({ scene: stateSync.scene, actor: s, msg, gmPresent: gmPresent() }));
+    },
+    PLAYER_AREA_REMOVE(s, msg) {
+      runAction(s, msg, { action: 'area-remove', id: msg.id }, () => removeArea({ scene: stateSync.scene, actor: s, msg, gmPresent: gmPresent() }));
     },
     PLAYER_END_TURN(s, msg) {
       runAction(s, msg, { action: 'end-turn', id: msg.tokenId }, memoryOfActions => endTurn({

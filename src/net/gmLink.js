@@ -15,7 +15,7 @@ import { createConnection, createSystemClock } from './connection.js';
 /** The parts of the GM's state that make up the shared scene. Pan, zoom, selection and open panels are not here. */
 export const SCENE_KEYS = [
   'mapImageSrc', 'mapWidth', 'mapHeight', 'showGrid', 'gridSize', 'gridColor', 'gridOpacity', 'feetPerCell',
-  'snapToGrid', 'playerCanMoveTokens', 'showFog', 'fogCells', 'fogColor', 'fogOpacity', 'areaEffects', 'markers',
+  'snapToGrid', 'playerCanMoveTokens', 'playerCanEditCombat', 'playerCanCast', 'showFog', 'fogCells', 'fogColor', 'fogOpacity', 'areaEffects', 'markers',
   'playerViewRect', 'tokens', 'combat', 'handoutSrc', 'handoutName',
 ];
 
@@ -88,6 +88,10 @@ export function createGMLink({
       else if (message.type === 'MAP_PING') handlers.onPing?.(message);
       else if (message.type === 'TOKEN_LIVE') handlers.onTokenLive?.(message);
       else if (message.type === 'PLAYER_END_TURN') handlers.onEndTurn?.(message);
+      else if (message.type === 'PLAYER_COMBAT_EDIT') handlers.onCombatEdit?.(message);
+      else if (message.type === 'PLAYER_DELAY_TURN') handlers.onDelayTurn?.(message);
+      else if (message.type === 'PLAYER_AREA_ADD') handlers.onAreaAdd?.(message);
+      else if (message.type === 'PLAYER_AREA_REMOVE') handlers.onAreaRemove?.(message);
       else if (message.type === 'JOIN_REQUEST') handlers.onJoinRequest?.(message);
       else if (message.type === 'TABLE') { table = message; handlers.onTable?.(message); }
       else if (message.type === 'AUDIO_LISTENER' || message.type === 'AUDIO_ANSWER' || message.type === 'AUDIO_STATS') handlers.onAudio?.(message);

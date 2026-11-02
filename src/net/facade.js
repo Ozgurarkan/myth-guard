@@ -127,6 +127,26 @@ export function sendPlayerPing(x, y) {
   return playerLink?.sendPing(x, y) ?? false;
 }
 
+/** Your own hero's hit points and/or initiative during a fight: `fields` is { hp?, maxHp?, initiative? }. The server checks it is yours. */
+export function sendPlayerCombatEdit(tokenId, fields) {
+  return playerLink?.sendCombatEdit(tokenId, fields) ?? false;
+}
+
+/** "I wait until after ...": your hero acts right after `after` this round, then returns to its own place. */
+export function sendPlayerDelayTurn(tokenId, after) {
+  return playerLink?.sendDelayTurn(tokenId, after) ?? false;
+}
+
+/** Cast a spell area, or a circle bound to one of your heroes. The server checks the hero is yours and the GM allows casting. */
+export function sendPlayerAreaAdd(fields) {
+  return playerLink?.sendAreaAdd(fields) ?? false;
+}
+
+/** Take back one of your own spell areas (`{ id }`) or all of them (`{ all: true }`). */
+export function sendPlayerAreaRemove(fields) {
+  return playerLink?.sendAreaRemove(fields) ?? false;
+}
+
 /** "My turn is over." The server checks it is really this hero's turn before the GM hears of it. */
 export function sendPlayerEndTurn(tokenId) {
   return playerLink?.sendEndTurn(tokenId) ?? false;

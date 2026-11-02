@@ -26,6 +26,9 @@ function FeetField({ label, value, feetPerCell, presets = [], onChange }) {
   );
 }
 
+/** Who cast a player's effect, for the list. */
+const casterName = (state, effect) => state.players.find(player => player.id === effect.ownerId)?.name || 'A player';
+
 export function SpellsPanel() {
   const { state, dispatch } = useGM();
   const exact = state.areaSizeMode === 'exact';
@@ -58,7 +61,6 @@ export function SpellsPanel() {
             <input type="range" min={10} max={180} step={5} value={state.areaConeAngle} aria-label="Cone spread" onChange={event => prop('areaConeAngle', Number(event.target.value))} />
           </Field>
         </>}
-        <p className="panel-note">Click the map to drop a shape of exactly this size{shape === 'cone' ? ' — hold and drag to aim the cone' : ''}.{state.snapToGrid ? ' It snaps to the grid.' : ''}</p>
       </>}
 
       <Field label="Damage type">
@@ -68,12 +70,12 @@ export function SpellsPanel() {
       </PanelSection>
 
       <PanelSection title="Placed on the map" count={state.areaEffects.length}>
-      {state.areaEffects.length === 0 && <EmptyState icon="wand-sparkles" title="No spell areas">Pick a shape, then drag on the map. Everyone sees the area as soon as you place it.</EmptyState>}
+      {state.areaEffects.length === 0 && <EmptyState icon="wand-sparkles" title="No spell areas" />}
       <div className="rows">
         {state.areaEffects.map(effect => (
           <div key={effect.id} className={`row is-clickable effect-row${state.selectedId === effect.id ? ' is-selected' : ''}`} onClick={() => dispatch({ type: 'SELECT', id: effect.id })}>
             <span className="effect-dot" style={{ '--c': effect.color }}><Icon name={effect.type === 'cone' ? 'cone' : effect.type === 'rect' ? 'square-dashed' : 'circle-dashed'} size={16} /></span>
-            <div className="row__main"><span className="row__title">{effect.type === 'rect' ? 'Square' : effect.type === 'cone' ? 'Cone' : 'Circle'}</span><span className="row__meta">{areaSizeLabel(effect, state.gridSize, state.feetPerCell)}</span></div>
+            <div className="row__main"><span className="row__title">{effect.type === 'rect' ? 'Square' : effect.type === 'cone' ? 'Cone' : 'Circle'}</span><span className="row__meta">{areaSizeLabel(effect, state.gridSize, state.feetPerCell)}{effect.ownerId ? ` · ${casterName(state, effect)}` : ''}{effect.boundTo ? ' · follows a hero' : ''}</span></div>
             <IconButton icon="trash" size="sm" label="Delete spell area" onClick={event => { event.stopPropagation(); dispatch({ type: 'AREA_DELETE', id: effect.id }); }} />
           </div>
         ))}

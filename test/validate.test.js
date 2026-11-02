@@ -17,6 +17,10 @@ test('every type in the player and GM catalogues has a validator that accepts a 
     PLAYER_NAME: { name: 'Thorin' },
     PLAYER_TOKEN_MOVE: { aid: 3, id: 'hero', x: 1, y: 2 },
     PLAYER_PING: { x: 1, y: 2 },
+    PLAYER_COMBAT_EDIT: { aid: 5, tokenId: 'hero', hp: 7, maxHp: 30, initiative: 14 },
+    PLAYER_DELAY_TURN: { aid: 6, tokenId: 'hero', after: 'goblin' },
+    PLAYER_AREA_ADD: { aid: 8, id: 'fx1', shape: 'cone', color: '#e5533d', x: 10, y: 20, radius: 150, angle: 60, rotation: 45 },
+    PLAYER_AREA_REMOVE: { aid: 9, id: 'fx1' },
     PLAYER_TOKEN_LIVE: { id: 'hero', x: 1, y: 2 },
     GM_TOKEN_LIVE: { id: 'hero', x: 1, y: 2 },
     PLAYER_END_TURN: { aid: 4, tokenId: 'hero' },
@@ -41,6 +45,20 @@ test('every type in the player and GM catalogues has a validator that accepts a 
     const result = frame('gm', { type, ...samples[type] });
     assert.equal(result.ok, true, `${type}: ${JSON.stringify(result)}`);
   }
+});
+
+test('spell-area messages are copied field by field; shapes, colours and numbers outside the rules are refused', () => {
+  const add = fields => frame('player', { type: 'PLAYER_AREA_ADD', id: 'fx1', shape: 'circle', color: '#e5533d', x: 1, y: 2, radius: 100, ...fields });
+  const good = add({ aid: 2, boundTo: 'hero', extra: 'dropped', __proto__x: 1 });
+  assert.equal(good.ok, true);
+  assert.deepEqual(good.msg, { type: 'PLAYER_AREA_ADD', id: 'fx1', shape: 'circle', color: '#e5533d', x: 1, y: 2, radius: 100, boundTo: 'hero', aid: 2 });
+  for (const bad of [{ id: 'a b' }, { id: undefined }, { shape: 'star' }, { shape: undefined }, { color: 'red' }, { color: '#fff' }, { color: undefined }, { x: 1e12 }, { radius: 1e9 },
+    { radius: 'big' }, { angle: NaN }, { boundTo: 7 }, { aid: -1 }]) {
+    assert.equal(add(bad).ok, false, JSON.stringify(bad));
+  }
+  assert.deepEqual(frame('player', { type: 'PLAYER_AREA_REMOVE', all: true, id: 'ignored' }).msg, { type: 'PLAYER_AREA_REMOVE', all: true });
+  assert.deepEqual(frame('player', { type: 'PLAYER_AREA_REMOVE', id: 'fx1' }).msg, { type: 'PLAYER_AREA_REMOVE', id: 'fx1' });
+  for (const bad of [{}, { id: 5 }, { id: 'a b' }, { all: 'yes' }, { id: 'fx1', aid: -3 }]) assert.equal(frame('player', { type: 'PLAYER_AREA_REMOVE', ...bad }).ok, false, JSON.stringify(bad));
 });
 
 test('malformed input is refused with a code and never throws', () => {

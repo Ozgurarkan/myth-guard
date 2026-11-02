@@ -2,7 +2,8 @@
 import React, { useEffect, useState } from 'react';
 import { Button, IconButton, Avatar, Badge, EmptyState, Icon, ask, toast } from '../../ui';
 import { useGM } from '../../store';
-import { initiativeOrder, tokenKind, healthCondition, combatEntryFor } from '../../combat';
+import { SkullMark } from '../../brand';
+import { turnOrder, delayedIds, delayTargets, tokenKind, healthCondition, combatEntryFor } from '../../combat';
 import { PanelSection } from './PanelParts';
 
 const d20 = () => 1 + Math.floor(Math.random() * 20);
@@ -53,9 +54,13 @@ function HealthBar({ entry }) {
   );
 }
 
-function CombatRow({ token, entry, active, amount, rank }) {
-  const { dispatch } = useGM();
+function CombatRow({ token, entry, active, amount, rank, delayed }) {
+  const { state, dispatch } = useGM();
+  const [delayOpen, setDelayOpen] = useState(false);
   const kind = tokenKind(token);
+  // Whoever's turn it is may step out and act after a later combatant of their own kind (heroes after heroes, creatures after creatures), once a round.
+  const delayChoices = active && !delayed ? delayTargets(state.combat, state.tokens, token.id) : [];
+  const delayWith = afterId => { setDelayOpen(false); dispatch({ type: 'COMBAT_DELAY', tokenId: token.id, after: afterId }); };
   const upsert = patch => dispatch({ type: 'COMBAT_UPSERT', entry: { ...entry, ...patch } });
   // The maximum is remembered on the token, so the next fight starts with it already filled in.
   const rememberMax = value => dispatch({ type: 'TOKEN_UPDATE', token: { ...token, maxHp: value } });
@@ -63,20 +68,23 @@ function CombatRow({ token, entry, active, amount, rank }) {
     if (!entry.maxHp) { toast('Set maximum hit points first.', { tone: 'warning' }); return; }
     upsert({ hp: Math.max(0, Math.min(entry.maxHp, entry.hp + sign * amount)) });
   };
-  const down = entry.maxHp && entry.hp <= 0;
+  const dead = token.dead === true;
+  const down = !dead && entry.maxHp && entry.hp <= 0;
   const tone = hpTone(entry);
   const name = token.name || 'token';
   return (
-    <article className={`combatant${active ? ' is-active' : ''}${down ? ' is-down' : ''}`} aria-current={active ? 'step' : undefined}>
+    <article className={`combatant${active ? ' is-active' : ''}${down ? ' is-down' : ''}${dead ? ' is-dead' : ''}`} aria-current={active ? 'step' : undefined}>
       <header className="combatant__head">
         <span className="combatant__avatar">
-          <Avatar src={token.portraitSrc || token.imageSrc} name={token.name} color={token.color} size={42} />{down && <Icon name="skull" size={18} className="combatant__skull" />}
+          <Avatar src={token.portraitSrc || token.imageSrc} name={token.name} color={token.color} size={42} />{dead && <SkullMark size={26} className="combatant__skull" />}
           <span className="combatant__rank" title={`Position ${rank} in the initiative order`}><span className="sr-only">Position </span>{rank}</span>
         </span>
         <div className="row__main">
           <strong className="row__title">{token.name || 'Unnamed'}</strong>
           <span className="combatant__tags">
             {active && <Badge tone="accent" icon="sparkles" className="combatant__turn">Turn</Badge>}
+            {dead && <Badge tone="danger" icon="skull">Dead</Badge>}
+            {delayed && !active && <Badge tone="accent" icon="hourglass" title="Delayed: acts here this round, back in the usual place next round">Delayed</Badge>}
             <button type="button" className="kind-toggle" title={kind === 'npc' ? 'Creature: players see only its condition. Click to treat as a hero.' : 'Hero: players see exact hit points. Click to treat as a creature.'}
               onClick={() => dispatch({ type: 'TOKEN_UPDATE', token: { ...token, characterType: kind === 'npc' ? 'pc' : 'npc' } })}>
               <Icon name={kind === 'npc' ? 'skull' : 'shield'} size={12} />{kind === 'npc' ? 'Creature' : 'Hero'}
@@ -84,8 +92,18 @@ function CombatRow({ token, entry, active, amount, rank }) {
             {tone && <span className={`hp-state is-${tone}`}><Icon name={HP_ICON[tone]} size={12} />{healthCondition(entry)}</span>}
           </span>
         </div>
+        {delayChoices.length > 0 && <IconButton icon="hourglass" size="sm" variant={delayOpen ? 'primary' : 'ghost'} label={`Delay ${name}'s turn`} aria-expanded={delayOpen} onClick={() => setDelayOpen(open => !open)} />}
+        <IconButton icon="skull" size="sm" variant={dead ? 'primary' : 'ghost'} label={dead ? `Revive ${name}` : `Mark ${name} dead`} onClick={() => dispatch({ type: 'TOKEN_TOGGLE_DEAD', id: token.id })} />
         <IconButton icon="x" size="sm" label={`Remove ${name} from combat`} onClick={() => dispatch({ type: 'COMBAT_REMOVE', id: token.id })} />
       </header>
+      {delayOpen && delayChoices.length > 0 && (
+        <div className="chips" role="group" aria-label={`Delay ${name} until after`}>
+          {delayChoices.map(choice => {
+            const other = state.tokens.find(t => t.id === choice.tokenId);
+            return other && <button key={choice.tokenId} type="button" className="chip" onClick={() => delayWith(choice.tokenId)}><Avatar src={other.portraitSrc || other.imageSrc} name={other.name} color={other.color} size={20} />After {other.name || 'Unnamed'}</button>;
+          })}
+        </div>
+      )}
       <div className="combatant__hp">
         <Button size="sm" variant="danger" icon="minus" onClick={() => hit(-1)} disabled={!entry.maxHp} title={`Deal ${amount} damage`} aria-label={`Deal ${amount} damage to ${name}`}>{amount}</Button>
         <HealthBar entry={entry} />
@@ -123,7 +141,8 @@ export function CombatPanel() {
   const { state, dispatch } = useGM();
   const [amount, setAmount] = useState(5);
   const combat = state.combat;
-  const order = initiativeOrder(combat);
+  const order = turnOrder(combat);
+  const waitingIds = delayedIds(combat);
   const waiting = state.tokens.filter(token => !order.some(entry => entry.tokenId === token.id));
   const add = (token, initiative) => dispatch({ type: 'COMBAT_UPSERT', entry: combatEntryFor(token, initiative) });
   const activeToken = combat.activeId ? state.tokens.find(token => token.id === combat.activeId) : null;
@@ -177,17 +196,15 @@ export function CombatPanel() {
           <div className="combatants">
             {order.map((entry, index) => {
               const token = state.tokens.find(t => t.id === entry.tokenId);
-              return token && <CombatRow key={token.id} token={token} entry={entry} rank={index + 1} active={combat.activeId === token.id} amount={amount} />;
+              return token && <CombatRow key={token.id} token={token} entry={entry} rank={index + 1} active={combat.activeId === token.id} amount={amount} delayed={waitingIds.includes(token.id)} />;
             })}
           </div>
         </PanelSection>
       </>}
 
       <PanelSection title="Not in combat" count={waiting.length} action={waiting.length > 1 && <Button size="sm" icon="dices" onClick={rollEveryone}>Roll all</Button>}>
-        {state.tokens.length === 0 && <EmptyState icon="swords" title="No combatants yet">Add heroes and creatures to the map, then roll for initiative here.</EmptyState>}
-        {state.tokens.length > 0 && waiting.length === 0 && <p className="panel-note">Everyone on the map is in the fight.</p>}
+        {state.tokens.length === 0 && <EmptyState icon="swords" title="No combatants yet" />}
         <div className="rows">{waiting.map(token => <WaitingRow key={token.id} token={token} onAdd={add} />)}</div>
-        <p className="panel-note">Highest initiative goes first. Hidden and fogged tokens never appear on your players’ initiative bar.</p>
       </PanelSection>
     </div>
   );

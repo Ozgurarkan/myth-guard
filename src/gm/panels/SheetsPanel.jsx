@@ -57,7 +57,7 @@ export function SheetsPanel() {
     <div>
       <PanelSection title="Open sheets" count={state.sheetTabs.length}>
       {state.sheetTabs.length === 0 ? (
-        <EmptyState icon="book-user">Open the characters in this fight, then flip between them with the number keys.</EmptyState>
+        <EmptyState icon="book-user" title="No sheets open" />
       ) : <>
         <div className="rows">
           {state.sheetTabs.map((tab, index) => (
@@ -101,7 +101,6 @@ export function SheetsPanel() {
             );
           })}
         </div>
-        <p className="panel-note">Sheets stay in this browser and are never sent to players. Open sheets keep their page and scroll position.</p>
       </PanelSection>
     </div>
   );

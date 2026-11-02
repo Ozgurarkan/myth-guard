@@ -2,6 +2,7 @@
 // Styles live in src/styles/components.css.
 import React, { createContext, useContext, useEffect, useId, useRef, useState, useSyncExternalStore } from 'react';
 import { ICONS } from './icons.js';
+import { useTheme, DEFAULT_THEME } from './theme';
 
 const cx = (...parts) => parts.filter(Boolean).join(' ');
 
@@ -163,10 +164,14 @@ export function SectionHead({ children, action, count }) {
   );
 }
 
+/** The empty-state illustration in the current theme's colours: the original is Moonlit's, the others are made by scripts/build-themed-art.py. */
+export const artSrc = (art, theme) => (theme === DEFAULT_THEME ? `/brand/empty-${art}.png` : `/brand/themed/empty-${art}.${theme}.png`);
+
 export function EmptyState({ icon = 'scroll-text', art, title, children, action }) {
+  const [theme] = useTheme();
   return (
     <div className="empty-state">
-      {art ? <img className="empty-state__art" src={`/brand/empty-${art}.png`} alt="" aria-hidden="true" draggable="false" /> : <Icon name={icon} size={28} />}
+      {art ? <img className="empty-state__art" src={artSrc(art, theme)} alt="" aria-hidden="true" draggable="false" /> : <Icon name={icon} size={28} />}
       {title && <strong>{title}</strong>}
       {children && <p>{children}</p>}
       {action}

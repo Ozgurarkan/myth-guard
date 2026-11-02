@@ -9,30 +9,48 @@ import { Shape, Group, Circle, Rect, Text, Line, Ellipse, Image as KImg, Arc, Re
 import useImage from 'use-image';
 import { PING_MS } from '../pings';
 import { useStage } from '../stageView';
+import { cssColor, cssRgba, onThemeChange } from '../theme';
 
 // Canvases are drawn at no more than 1.75x the screen's pixel size. A phone reports 3x, which means nine times the pixels
 // to repaint on every frame of a pan, zoom or pulse, for a sharpness nobody can see on a battle map.
 if (typeof window !== 'undefined') Konva.pixelRatio = Math.min(window.devicePixelRatio || 1, 1.75);
 
-// Family names are the ones @fontsource-variable registers ('Inter Variable', 'Cormorant Variable').
+// Family names are the ones @fontsource-variable registers ('Inter Variable', 'Outfit Variable').
 export const FONT_BODY = "'Inter Variable', Inter, system-ui, 'Segoe UI', sans-serif";
-export const FONT_DISPLAY = "'Cormorant Variable', Cormorant, Georgia, serif";
+export const FONT_DISPLAY = "'Outfit Variable', Outfit, 'Inter Variable', system-ui, sans-serif";
 
-// Konva cannot read CSS variables, so the "moonlit spell-library" palette (src/styles/tokens.css) is mirrored here as literals.
-export const ACCENT = '#a58bff';        // --accent        arcane violet
-export const ACCENT_HI = '#cbbcff';     // --accent-hi
-export const ACCENT_LO = '#6a4fd6';     // --accent-lo
-export const CYAN = '#4fd8ee';          // --accent-2      spell-cyan (active turn, player frame)
-export const CYAN_HI = '#9bebf7';       // --accent-2-hi
-export const DANGER = '#ff6f8e';        // --danger
-export const SUCCESS = '#4fe3a1';       // --success
-export const WARNING = '#ffc15a';       // --warning
-export const SURFACE_0 = '#060916';     // --surface-0
-export const SURFACE_1 = '#0b1024';     // --surface-1
-export const TEXT_3 = '#a0acd6';        // --text-3
-export const INK = '#eef2ff';           // --text
-export const INK_STROKE = '#060916';    // dark halo behind map text, so labels read on any map
-export const DEFAULT_TOKEN_COLOR = '#8591c0';   // --text-4
+// Konva cannot read CSS variables, so the palette is read from them here (src/styles/tokens.css and themes.css) and read again
+// whenever the theme changes. These are live bindings: importers see the new colours on their next render, and the stage
+// components re-render on a theme change (useThemeVersion). The literals are only the Moonlit defaults for a page with no styles.
+export let ACCENT = '#a58bff';        // --accent        arcane violet
+export let ACCENT_HI = '#cbbcff';     // --accent-hi
+export let ACCENT_LO = '#6a4fd6';     // --accent-lo
+export let CYAN = '#4fd8ee';          // --accent-2      spell-cyan (active turn, player frame)
+export let CYAN_HI = '#9bebf7';       // --accent-2-hi
+export let CYAN_WASH = 'rgba(79, 216, 238, 0.06)';   // --accent-2 at 6%, the fill of the player-view frame
+export let DANGER = '#ff6f8e';        // --danger
+export let SUCCESS = '#4fe3a1';       // --success
+export let WARNING = '#ffc15a';       // --warning
+export let SURFACE_0 = '#060916';     // --surface-0
+export let SURFACE_1 = '#0b1024';     // --surface-1
+export let SURFACE_SUNKEN = '#050813';   // --surface-sunken: the well behind a health bar
+export let FRAME_FILL = '#03050d';    // behind the map picture, inside its frame
+export let FRAME_STROKE = '#4458a0';  // --border-strong: the map's outline
+export let MAP_FILL = '#0e1430';      // the blank map of a table with no picture
+export let TEXT_3 = '#a0acd6';        // --text-3
+export let INK = '#eef2ff';           // --text
+export let INK_STROKE = '#060916';    // --surface-0: the halo behind map text, so labels read on any map
+export let DEFAULT_TOKEN_COLOR = '#8591c0';   // --text-4
+function readPalette() {
+  ACCENT = cssColor('--accent', ACCENT); ACCENT_HI = cssColor('--accent-hi', ACCENT_HI); ACCENT_LO = cssColor('--accent-lo', ACCENT_LO);
+  CYAN = cssColor('--accent-2', CYAN); CYAN_HI = cssColor('--accent-2-hi', CYAN_HI); CYAN_WASH = cssRgba('--accent-2-rgb', 0.06, CYAN_WASH);
+  DANGER = cssColor('--danger', DANGER); SUCCESS = cssColor('--success', SUCCESS); WARNING = cssColor('--warning', WARNING);
+  SURFACE_0 = cssColor('--surface-0', SURFACE_0); SURFACE_1 = cssColor('--surface-1', SURFACE_1); SURFACE_SUNKEN = cssColor('--surface-sunken', SURFACE_SUNKEN);
+  FRAME_FILL = cssColor('--surface-sunken', FRAME_FILL); FRAME_STROKE = cssColor('--border-strong', FRAME_STROKE); MAP_FILL = cssColor('--surface-2', MAP_FILL);
+  TEXT_3 = cssColor('--text-3', TEXT_3); INK = cssColor('--text', INK); INK_STROKE = cssColor('--surface-0', INK_STROKE); DEFAULT_TOKEN_COLOR = cssColor('--text-4', DEFAULT_TOKEN_COLOR);
+}
+readPalette();
+onThemeChange(readPalette);
 
 /** Canvas text is painted once, so it must wait for the web fonts. Returns a number that changes when they arrive. */
 export function useFontsVersion() {
@@ -128,20 +146,58 @@ function HiddenBadge({ x, y }) {
   );
 }
 
+const DEAD_GRAY = '#8b8f9c';
+const BONE = '#d9dce6';
+
+/** The token's picture. A dead token's picture is turned to grey scale (if the browser will not let us read it, it is only dimmed). */
+function TokenPicture({ img, size, opacity, gray }) {
+  const ref = useRef(null);
+  useEffect(() => {
+    const node = ref.current;
+    if (!node) return;
+    try {
+      if (gray) { node.cache(); node.filters([Konva.Filters.Grayscale]); } else { node.filters([]); node.clearCache(); }
+    } catch { /* an unreadable picture stays in colour */ }
+    node.getLayer()?.batchDraw();
+  }, [gray, img, size]);
+  return <KImg ref={ref} x={0} y={0} width={size} height={size} image={img} opacity={opacity} />;
+}
+
+export const SKULL_SRC = '/brand/skull.png';
+
+/** The death skull: the artwork in public/brand/skull.png, with a plain drawn skull standing in until it has loaded. */
+function Skull({ r }) {
+  const [art] = useImage(SKULL_SRC);
+  if (art) return <KImg x={-r * 1.05} y={-r * 1.05} width={r * 2.1} height={r * 2.1} image={art} listening={false} />;
+  const line = Math.max(1, r * 0.1);
+  return (
+    <Group listening={false}>
+      <Rect x={-r * 0.48} y={r * 0.5} width={r * 0.96} height={r * 0.62} cornerRadius={r * 0.14} fill={BONE} stroke={INK_STROKE} strokeWidth={line} />
+      <Circle radius={r} fill={BONE} stroke={INK_STROKE} strokeWidth={line} />
+      <Circle x={-r * 0.38} y={-r * 0.05} radius={r * 0.27} fill={INK_STROKE} />
+      <Circle x={r * 0.38} y={-r * 0.05} radius={r * 0.27} fill={INK_STROKE} />
+      <Line points={[0, r * 0.2, -r * 0.13, r * 0.45, r * 0.13, r * 0.45]} closed fill={INK_STROKE} />
+      {[-0.24, 0, 0.24].map(at => <Line key={at} points={[r * at, r * 0.72, r * at, r * 1.08]} stroke={INK_STROKE} strokeWidth={line} />)}
+    </Group>
+  );
+}
+
 /**
  * The token's picture, ring, number badge and name. Interaction is added by the caller's Group.
  * States, each with a non-colour cue:  selected = extra solid halo ring · active turn = pulsing ring + pointer above ·
- * hidden (`ghost`) = faded + dashed ring + eye-slash badge · down (hp 0) = dimmed + a cross over the token + empty HP bar.
+ * hidden (`ghost`) = faded + dashed ring + eye-slash badge · down (hp 0, `down`) = dimmed, a red halo and tint, a cross over the token and an
+ * empty HP bar · dead (`token.dead`) = grey scale picture and ring with a skull: the token stays like that after the fight ends.
  */
-export function TokenArt({ token, gridSize, selected = false, dragging = false, turn = false, ghost = false, hp = null, showName = true }) {
+export function TokenArt({ token, gridSize, selected = false, dragging = false, turn = false, ghost = false, hp = null, showName = true, down: isDown = false }) {
   const [img] = useImage(token.imageSrc || '');
   const size = token.gridSize * gridSize;
   const half = size / 2;
   const ring = token.borderWidth ?? 8;
-  const color = token.color || DEFAULT_TOKEN_COLOR;
+  const dead = token.dead === true;
+  const color = dead ? DEAD_GRAY : token.color || DEFAULT_TOKEN_COLOR;
   const inner = Math.max(1, half - ring / 2);
-  const down = !!hp && hp.fraction <= 0;
-  const fade = down ? 0.55 : 1;
+  const down = !dead && (isDown || (!!hp && hp.fraction <= 0));
+  const fade = dead ? 0.8 : down ? 0.55 : 1;
   return (
     <>
       {turn && <TurnRing radius={half} />}
@@ -152,7 +208,7 @@ export function TokenArt({ token, gridSize, selected = false, dragging = false, 
       {img && (
         // Konva only clips containers, so the picture goes in a Group shaped like the ring.
         <Group clipFunc={ctx => { ctx.beginPath(); ctx.arc(half, half, inner, 0, Math.PI * 2); ctx.closePath(); }} listening={false}>
-          <KImg x={0} y={0} width={size} height={size} image={img} opacity={(ghost ? 0.55 : 1) * fade} />
+          <TokenPicture img={img} size={size} opacity={(ghost ? 0.55 : 1) * fade} gray={dead} />
         </Group>
       )}
       <Circle x={half} y={half} radius={inner} fill={img ? 'transparent' : `${color}33`} stroke={color} strokeWidth={ring}
@@ -161,6 +217,14 @@ export function TokenArt({ token, gridSize, selected = false, dragging = false, 
         <Text x={0} y={half - size * 0.17} width={size} align="center" text={token.name.trim().slice(0, 2).toUpperCase()} fontFamily={FONT_DISPLAY}
           fontStyle="bold" fontSize={size * 0.34} fill={INK} opacity={fade} listening={false} />
       )}
+      {dead && (
+        <Group x={half} y={half} listening={false}>
+          <Circle radius={inner} fill={INK_STROKE} opacity={0.4} />
+          <Skull r={Math.max(7, inner * 0.52)} />
+        </Group>
+      )}
+      {down && <Circle x={half} y={half} radius={inner} fill={DANGER} opacity={0.2} listening={false} />}
+      {down && <Circle x={half} y={half} radius={half + 3} stroke={DANGER} strokeWidth={3} dash={[6, 4]} listening={false} />}
       {down && (
         <Group x={half} y={half} listening={false}>
           {[[INK_STROKE, 7], [DANGER, 3.5]].map(([stroke, width]) => (
@@ -180,7 +244,7 @@ export function TokenArt({ token, gridSize, selected = false, dragging = false, 
       )}
       {hp && (
         <Group x={size * 0.12} y={size + 3} listening={false}>
-          <Rect width={size * 0.76} height={6} fill="#050813" cornerRadius={3} stroke={INK_STROKE} strokeWidth={0.5} />
+          <Rect width={size * 0.76} height={6} fill={SURFACE_SUNKEN} cornerRadius={3} stroke={INK_STROKE} strokeWidth={0.5} />
           <Rect x={0.5} y={0.5} width={Math.max(0, (size * 0.76 - 1) * hp.fraction)} height={5} fill={hp.fraction > 0.5 ? SUCCESS : hp.fraction > 0.25 ? WARNING : DANGER} cornerRadius={2.5} />
         </Group>
       )}

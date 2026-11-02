@@ -35,7 +35,7 @@ export function SoundPanel() {
       )}
 
       <PanelSection title="Volume for players" card>
-        <Switch checked={audio.playerMuted} onChange={value => c().setPlayerMuted(value)} label="Mute the players" hint="Silences every selected device without stopping the broadcast." disabled={!audio.connected} />
+        <Switch checked={audio.playerMuted} onChange={value => c().setPlayerMuted(value)} label="Mute the players" disabled={!audio.connected} />
         <label className="volume">
           <span><Icon name={audio.playerMuted || volume === 0 ? 'volume-x' : 'volume-2'} size={16} />Volume</span><output>{volume}%</output>
           <input type="range" min="0" max="1" step="0.05" value={audio.playerVolume} aria-label="Player audio volume" disabled={!audio.connected} onChange={event => c().setPlayerVolume(Number(event.target.value))} />
@@ -46,7 +46,7 @@ export function SoundPanel() {
         <Button size="sm" variant="ghost" onClick={() => c().selectAllDevices(true)}>All</Button>
         <Button size="sm" variant="ghost" onClick={() => c().selectAllDevices(false)}>None</Button>
       </>}>
-        {audio.devices.length === 0 && <EmptyState icon="headphones" title="No player screens connected">Players appear here once they join the table.</EmptyState>}
+        {audio.devices.length === 0 && <EmptyState icon="headphones" title="No player screens connected" />}
         <div className="rows">
           {audio.devices.map(device => (
             <div className={`row device${device.selected ? ' is-selected' : ''}`} key={device.id} data-device-id={device.id}>
@@ -63,7 +63,6 @@ export function SoundPanel() {
             </div>
           ))}
         </div>
-        <p className="panel-note">New devices start unticked. “Needs a tap” means that player must touch their screen once so the browser allows sound.</p>
       </PanelSection>
     </div>
   );

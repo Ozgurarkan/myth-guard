@@ -56,8 +56,13 @@ Tips:
   you rarely need the Combat tab open.
 * Hidden tokens appear faded on your map, so you always know what players cannot see.
 * **Ctrl+S** saves, **?** lists every shortcut.
-* Creatures show players a *condition* (Healthy → Wounded → Badly wounded → Almost
-  dead → Down); heroes show exact hit points.
+* Creatures show players a *condition* (Healthy → Minor injury → Injured → Bloodied →
+  Severely injured → Critically injured → Down); heroes show exact hit points.
+* A token at 0 hit points shows a **Down** effect (red halo, tint and cross; a red
+  *Down* ribbon on its portrait). **Mark dead** (on the selected token, or in the
+  combat list) turns the token and its portrait grey with a skull, and it stays that
+  way after combat ends until you press **Revive**. Dead heroes can't be dragged
+  by their players.
 
 ### Keyboard
 

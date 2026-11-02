@@ -1,0 +1,158 @@
+/* ════════════════════════════════════════════════════════════════════════════
+   Soft floating-card skin — GM screen
+   A floating nav bar, a slim rail of round icon buttons, a card for the open panel, a card
+   for the map and a pill for the tool dock. Loaded after gm.css and panels.css so it can
+   reshape them; shared parts are in skin.css. Colours come from tokens.css.
+   ════════════════════════════════════════════════════════════════════════════ */
+:root {
+  --header-h: 76px;                             /* 62px bar + the gap above it */
+  --status-h: 34px;
+  --tabs-w: 76px;                               /* 62px rail + the gap beside it */
+}
+@media (max-width: 1180px) { :root { --header-h: 68px; --tabs-w: 76px; } }
+@media (max-width: 960px) { :root { --tabs-w: 72px; } }
+
+/* Small caps labels become quiet sentence-case text */
+.tool-options__label, .preset-group__title, .status-label, .numfield span, .scene-chip__label, .brand small,
+.combat__round-text > span, .record__notes summary { text-transform: none; letter-spacing: .01em; }
+.numfield span, .status-label, .scene-chip__label, .brand small { font-size: 11px; }
+.preset-group__title, .combat__round-text > span, .record__notes summary { font-size: 12.5px; }
+
+/* Wells, chips and cards defined by panels.css */
+.check-list, .stepper { border-radius: 14px; box-shadow: var(--inset-soft); }
+.ping, .kind-toggle, .hp-state { border-color: var(--card-edge-strong); }
+.panel-card, .scene-card, .preset-card, .player-card, .combatant, .handout, .broadcast, .live-handout, .scene-current, .combat__amount,
+.gm-shortcuts section { border-color: var(--card-edge); }
+.panel-card, .scene-card, .preset-card, .player-card, .combatant, .handout, .broadcast, .live-handout, .scene-current { border-radius: 20px; }
+.combat__amount { border-radius: var(--radius-md); }
+.scene-card, .preset-card, .player-card, .combatant, .handout, .broadcast { box-shadow: var(--highlight-inset), var(--shadow-1); }
+.scene-card__art { border-radius: 20px 20px 0 0; }
+.handout__art { border-radius: var(--radius-md); }
+.status-item b::before { transform: none; border-radius: 50%; }
+.combat__bar, .session__join { border-color: var(--card-edge-strong); border-radius: 20px; }
+.combat__bar.is-running { border-color: var(--accent-lo); }
+.gm-ctx, .planner-menu__list { border-color: var(--card-edge-strong); border-radius: var(--radius-lg); }
+.gm-ctx__sep { background: var(--card-edge); }
+
+/* ── Shell: floating bar, round rail, panel card, map card, tool dock ─────── */
+.app { background: radial-gradient(900px 520px at 12% -8%, rgb(var(--accent-lo-rgb) / .16), transparent 70%), radial-gradient(760px 480px at 100% 100%, rgb(var(--accent-2-lo-rgb) / .1), transparent 70%), var(--surface-0); }
+
+.header {
+  margin: var(--gap) var(--gap) 0; padding-inline: var(--space-3);
+  border: 1px solid var(--card-edge); border-radius: var(--radius-full);
+  background: linear-gradient(180deg, var(--surface-2), var(--surface-1));
+  box-shadow: var(--highlight-inset), var(--shadow-2);
+}
+.header::after { display: none; }
+.brand { border-right: 0; margin-right: 0; padding-left: var(--space-2); }
+.header__actions { border-left: 0; padding-left: 0; }
+.table-status { border-radius: var(--radius-full); border-color: var(--card-edge-strong); }
+.table-status.is-open { border-color: var(--success-lo); }
+.table-status.is-reconnecting, .table-status.is-connecting { border-color: var(--warning-lo); }
+.table-status.has-requests { border-color: var(--warning); }
+.scene-chip { border-color: var(--card-edge-strong); box-shadow: var(--inset-soft); }
+
+.tab-rail {
+  align-items: center; gap: 6px; margin: var(--gap) 0 0 var(--gap); padding: 12px 7px; scrollbar-width: none;
+  border: 1px solid var(--card-edge); border-radius: var(--radius-xl);
+  background: linear-gradient(180deg, var(--surface-2), var(--surface-1));
+  box-shadow: var(--highlight-inset), var(--shadow-2);
+}
+.tab-rail::-webkit-scrollbar { display: none; }
+.tab-rail__legend { display: none; }
+.tab-rail__tab { width: 46px; min-height: 46px; height: 46px; padding: 0; border-radius: 50%; border-color: transparent; }
+.tab-rail__tab .icon { width: 21px; height: 21px; }
+.tab-rail__tab span { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }   /* the title tooltip names it; the panel header names it once open */
+.tab-rail__tab.is-active::after { display: none; }
+.tab-rail__dot { top: 8px; right: 8px; border-color: var(--surface-1); }
+
+.panel, .panel.codex {
+  margin: var(--gap) 0 0 var(--gap); border: 1px solid var(--card-edge); border-radius: var(--radius-xl);
+  background: radial-gradient(420px 220px at 100% 0%, rgb(var(--accent-lo-rgb) / .1), transparent 70%), var(--surface-1);
+  box-shadow: var(--highlight-inset), var(--shadow-2);
+}
+.panel__head { padding: 24px var(--space-4) var(--space-3) 24px; border-bottom: 0; }
+.panel__head::after { display: none; }
+.panel__head h2 { font: var(--fw-semibold) 28px/1.1 var(--font-display); letter-spacing: var(--tracking-tight); }
+.panel__body { padding: var(--space-2) 20px 26px 22px; }
+.library-form__title, .record h4 { font-family: var(--font-display); font-weight: var(--fw-semibold); }
+
+.sheet-viewer:not(.full) { margin: var(--gap) 0 0 var(--gap); overflow: hidden; border: 1px solid var(--card-edge); border-radius: var(--radius-xl); box-shadow: var(--highlight-inset), var(--shadow-2); }
+.sheet-viewer::before { display: none; }
+.sheet-tabs { border-bottom-color: var(--card-edge); }
+.sheet-tab { border-radius: var(--radius-full); border-color: var(--card-edge-strong); }
+
+.canvas-area { margin: var(--gap) var(--gap) 0; border: 1px solid var(--card-edge); border-radius: var(--radius-xl); box-shadow: var(--shadow-2); }
+.canvas-caption, .pv-badge { border-color: var(--card-edge-strong); }
+
+.status-bar { margin: 0 var(--gap); border-top: 0; background: transparent; }
+.status-item { border-right-color: var(--card-edge); }
+
+/* Tool dock: one floating pill */
+.rail { bottom: 16px; padding: 8px 14px; border-color: var(--card-edge-strong); border-radius: var(--radius-full); box-shadow: var(--highlight-inset), var(--shadow-3); scrollbar-width: none; }
+.rail::-webkit-scrollbar { display: none; }
+.rail__legend, .rail__title { display: none; }
+.rail__group { padding: 0 var(--space-2); border-right-color: var(--card-edge); }
+.rail-btn { min-height: 52px; border-radius: 18px; border-color: transparent; }
+.rail-btn.is-active::before { display: none; }
+
+/* The rail keeps all twelve panels in view as the window gets shorter */
+@media (max-height: 780px) {
+  .tab-rail { gap: 4px; padding-block: 8px; }
+  .tab-rail__tab { width: 40px; min-height: 40px; height: 40px; }
+  .tab-rail__tab .icon { width: 19px; height: 19px; }
+}
+@media (max-height: 680px) {
+  .tab-rail { gap: 2px; padding-block: 6px; }
+  .tab-rail__tab { width: 36px; min-height: 36px; height: 36px; }
+  .tab-rail__tab .icon { width: 18px; height: 18px; }
+}
+
+/* The dock answers to the width of the map card it floats on, not the window: with the panel open the card is narrow even on a big
+   screen. It loses its captions first, then its padding, so it never has to be cut off at the edge. */
+.canvas-area { container: map / inline-size; }
+@container map (max-width: 880px) {
+  .rail-btn { min-width: 44px; min-height: 46px; padding: 6px 4px; }
+  .rail-btn__label, .rail-btn__key { display: none; }
+  .rail__group { padding-inline: 4px; }
+}
+@container map (max-width: 640px) {
+  .rail { padding: 6px 8px; }
+  .rail-btn { min-width: 38px; min-height: 40px; }
+  .rail__group { padding-inline: 2px; gap: 1px; }
+}
+.combat-chip .eyebrow, .combat-chip__round span { white-space: nowrap; }
+
+/* A window the width of a phone keeps the status bar to what fits: the tool, the zoom, the grid and the table's link (the scale and the fog count go) */
+@media (max-width: 640px) {
+  .status-bar > :nth-child(5), .status-bar > :nth-child(6) { display: none; }
+}
+
+/* Rail buttons: glass pads that lift when touched and glow when on */
+.rail-btn:hover, .tab-rail__tab:hover { background: linear-gradient(180deg, rgb(255 255 255 / .1), rgb(255 255 255 / .02)); box-shadow: inset 0 1px 0 rgb(255 255 255 / .14), 0 4px 10px rgb(var(--shadow-rgb) / .3); }
+.rail-btn.is-active, .tab-rail__tab.is-active {
+  border-color: transparent; background: linear-gradient(180deg, rgb(255 255 255 / .16), rgb(255 255 255 / 0) 55%), var(--accent-wash-strong);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / .28), inset 0 -2px 4px rgb(var(--shadow-rgb) / .28), 0 1px 0 rgb(var(--shadow-rgb) / .4), 0 6px 14px var(--accent-wash);
+}
+.rail-btn:active, .tab-rail__tab:active { box-shadow: inset 0 2px 5px rgb(var(--shadow-rgb) / .45); }
+
+/* Floating over the map */
+.combat-chip, .tool-options, .selection-bar, .zoom, .share-banner, .pv-badge { border-color: var(--card-edge-strong); box-shadow: var(--highlight-inset), var(--shadow-2); }
+.combat-chip { box-shadow: var(--highlight-inset), var(--shadow-2), 0 8px 24px var(--accent-wash); }
+.zoom { border-radius: var(--radius-full); padding: 3px 5px; }
+.zoom__value { border-radius: var(--radius-full); }
+.tool-options, .selection-bar { border-radius: var(--radius-lg); }
+.welcome { border-color: var(--card-edge-strong); box-shadow: var(--highlight-inset), var(--shadow-3), 0 0 70px rgb(var(--accent-lo-rgb) / .1); }
+
+/* Smaller screens: the panel is a drawer, and the drawer keeps the card shape */
+@media (max-width: 960px) {
+  .panel, .panel.codex { margin: var(--gap) 0; }
+  .sheet-viewer:not(.full) { margin: 0; border-radius: var(--radius-xl) 0 0 var(--radius-xl); }
+  .rail { bottom: 10px; }
+}
+@media (max-width: 640px) {
+  .header { margin: 8px 8px 0; }
+  .canvas-area { margin: 8px 8px 0; border-radius: var(--radius-lg); }
+  .tab-rail { margin-left: 8px; }
+  .status-bar { margin: 0 8px; }
+}

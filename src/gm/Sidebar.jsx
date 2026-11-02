@@ -35,7 +35,6 @@ export function TabRail() {
   const { panelOpen, openPanel, setPanelOpen } = useWorkspace();
   return (
     <nav className="tab-rail" aria-label="Codex sections">
-      <span className="tab-rail__legend">Codex</span>
       {PANELS.map(panel => {
         const active = state.rightTab === panel.id && panelOpen;
         return (
@@ -61,9 +60,7 @@ export function Sidebar() {
     <aside className="panel codex" aria-label={panel.title}>
       <header className="panel__head">
         <div>
-          <span className="eyebrow">{panel.group}</span>
           <h2>{panel.title}</h2>
-          <p>{panel.help}</p>
         </div>
         <IconButton icon="x" label="Close panel" variant="ghost" onClick={() => { setPanelOpen(false); document.getElementById(`workspace-tab-${panel.id}`)?.focus(); }} />
       </header>

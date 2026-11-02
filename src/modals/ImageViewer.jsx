@@ -139,7 +139,6 @@ export default function ImageViewer({ src, alt = 'image', onClose, title, subtit
         <IconButton icon="expand" label="Fit to screen (0)" variant="ghost" onClick={reset} />
         {onClose && <Button size="sm" variant={player ? 'secondary' : 'danger'} icon={player ? 'eye-off' : 'x'} onClick={onClose}>{closeLabel}</Button>}
       </div>
-      <p className="viewer__hint">Scroll or pinch to zoom · drag to move · double-tap to zoom in</p>
     </div>
   );
 }

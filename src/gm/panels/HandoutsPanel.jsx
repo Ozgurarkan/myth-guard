@@ -65,7 +65,7 @@ export function HandoutsPanel() {
             <Button size="sm" icon="search" onClick={() => dispatch({ type: 'PREVIEW_SHOW', src: state.handoutSrc, name: state.handoutName })}>View</Button>
             <Button size="sm" variant="danger" onClick={hide}>Hide</Button>
           </div>
-        ) : <p className="panel-note">Nothing is being shown. Pick an image below, preview it privately first, then reveal it to the table.</p>}
+        ) : null}
       </PanelSection>
 
       <PanelSection title="Image library" count={images.length}>
@@ -76,7 +76,7 @@ export function HandoutsPanel() {
         </div>
         <div className="panel-gap" />
         {images.length > 3 && <SearchField label="Search images" placeholder="Search images…" value={filter} onChange={event => setFilter(event.target.value)} />}
-        {images.length === 0 && <EmptyState icon="images" title="No handouts yet">Letters, maps, portraits, strange symbols. Add them once and reveal them in one click.</EmptyState>}
+        {images.length === 0 && <EmptyState icon="images" title="No handouts yet" />}
         {images.length > 0 && visible.length === 0 && <EmptyState icon="search">No image matches “{filter}”.</EmptyState>}
 
         <div className="handout-grid">

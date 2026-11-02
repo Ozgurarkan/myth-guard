@@ -91,3 +91,14 @@ test('live drags are not stored: the scene the players hold does not move until 
   await gm.until(x => x.of('TOKEN_LIVE').length === 1);
   assert.equal(b.of('STATE_PATCH').length, 0);
 });
+
+test('a dead hero cannot be dragged: its player streams nothing', async t => {
+  const { a, b, gm, alice } = await seated(t);
+  const dead = sceneFor(alice.playerId);
+  dead.tokens = dead.tokens.map(token => (token.id === 'hero' ? { ...token, dead: true } : token));
+  gm.send({ type: 'SCENE', scene: dead });
+  await a.until(c => c.of('STATE_PATCH').length >= 1);
+  a.send({ type: 'PLAYER_TOKEN_LIVE', id: 'hero', x: 50, y: 50 });
+  await delay(200);
+  assert.equal(b.of('TOKEN_LIVE').length, 0);
+});

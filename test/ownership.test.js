@@ -11,6 +11,8 @@ test('only the assigned player can move a token, subject to GM visibility and mo
   assert.equal(canPlayerMoveToken(state, token, null), false);
   assert.equal(canPlayerMoveToken({ ...state, playerCanMoveTokens: false }, token, 'alice'), false);
   assert.equal(canPlayerMoveToken(state, { ...token, visibleToPlayers: false }, 'alice'), false);
+  assert.equal(canPlayerMoveToken(state, { ...token, dead: true }, 'alice'), false, 'the dead stay where they fell');
+  assert.equal(canPlayerMoveToken(state, { ...token, dead: false }, 'alice'), true);
   assert.equal(canPlayerMoveToken({ ...state, fogCells: ['1,1'] }, token, 'alice'), false);
   assert.equal(canPlayerMoveToken({ ...state, showFog: false, fogCells: ['1,1'] }, token, 'alice'), true);
   assert.equal(canPlayerMoveToken(state, { ...token, ownerId: 'bob' }, 'alice'), false);

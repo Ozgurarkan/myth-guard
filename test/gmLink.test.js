@@ -52,7 +52,7 @@ function stub() {
 test('SCENE_KEYS is the list the old broadcast.js had', () => {
   assert.deepEqual(SCENE_KEYS, [
     'mapImageSrc', 'mapWidth', 'mapHeight', 'showGrid', 'gridSize', 'gridColor', 'gridOpacity', 'feetPerCell',
-    'snapToGrid', 'playerCanMoveTokens', 'showFog', 'fogCells', 'fogColor', 'fogOpacity', 'areaEffects', 'markers',
+    'snapToGrid', 'playerCanMoveTokens', 'playerCanEditCombat', 'playerCanCast', 'showFog', 'fogCells', 'fogColor', 'fogOpacity', 'areaEffects', 'markers',
     'playerViewRect', 'tokens', 'combat', 'handoutSrc', 'handoutName',
   ]);
 });

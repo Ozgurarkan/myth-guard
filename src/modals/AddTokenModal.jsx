@@ -131,12 +131,12 @@ export default function AddTokenModal() {
               <Input id="token-name" value={form.name} placeholder="Aria, Goblin Boss, Innkeeper…" maxLength={60} data-autofocus onChange={event => set('name', event.target.value)} />
             </Field>
 
-            <Field label="Who is it?" hint={form.characterType === 'npc' ? 'Players see a creature’s condition (Healthy, Wounded, Down…), never its exact hit points.' : 'Players see a hero’s exact hit points in the initiative bar.'}>
+            <Field label="Who is it?">
               <Segmented label="Hero or creature" value={form.characterType} onChange={value => set('characterType', value)}
                 options={[{ value: 'pc', label: 'Hero (player character)', icon: 'shield' }, { value: 'npc', label: 'Creature / NPC', icon: 'skull' }]} />
             </Field>
 
-            <Field label="Max hit points" htmlFor="token-maxhp" hint="Used automatically whenever this token joins a fight, so you never retype it. Leave empty if you don’t track it.">
+            <Field label="Max hit points" htmlFor="token-maxhp">
               <Input id="token-maxhp" type="number" inputMode="numeric" min={1} max={99999} step={1} value={form.maxHp ?? ''} placeholder="—" style={{ width: 120 }}
                 onChange={event => setMaxHp(event.target.value)} />
             </Field>
@@ -153,7 +153,6 @@ export default function AddTokenModal() {
                 <Button size="sm" variant="ghost" icon="scan-eye" onClick={recropPortrait}>Crop initiative portrait</Button>
                 <Button size="sm" variant="ghost" icon="x" onClick={() => { set('imageSrc', null); set('portraitSrc', null); set('portraitSource', null); }}>Remove</Button>
               </>}
-              {!form.imageSrc && <span className="field__hint">You will crop it into a circle next.</span>}
             </div>
           </Field>
 
@@ -178,13 +177,13 @@ export default function AddTokenModal() {
 
         <section className="dlg-group" aria-label="Options">
           <h3 className="dlg-group__title">Options</h3>
-          <Switch checked={form.showNumber} onChange={value => set('showNumber', value)} label="Number badge" hint="Tell identical creatures apart: Goblin #1, #2, #3." />
+          <Switch checked={form.showNumber} onChange={value => set('showNumber', value)} label="Number badge" />
           {form.showNumber && <Field label="Number"><Input type="number" min={0} max={99} value={form.number} style={{ width: 100 }} onChange={event => set('number', Number(event.target.value))} /></Field>}
 
           {(isPresetEdit || (!isEditing && saveToLibrary)) && categories.length > 0 && (
             <Field label="Library group"><Select value={category} onChange={event => setCategory(event.target.value)} options={categories.map(cat => ({ value: cat.name, label: cat.name === 'PC' ? 'Heroes' : cat.name === 'NPC' ? 'Creatures & folk' : cat.name }))} /></Field>
           )}
-          {!isEditing && !isPresetEdit && <Switch checked={saveToLibrary} onChange={setSaveToLibrary} label="Keep in my token library" hint="Place it again in any scene with one click." />}
+          {!isEditing && !isPresetEdit && <Switch checked={saveToLibrary} onChange={setSaveToLibrary} label="Keep in my token library" />}
         </section>
       </form>
     </Modal>

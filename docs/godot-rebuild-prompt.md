@@ -94,7 +94,7 @@ Five regions: **header** (scene name, table status pill, import/save), **tool ra
 - **Handouts** appear full screen with *Hide for now* / *Show the handout*.
 - Connection pill (connected / reconnecting / quality). Dropped connections rejoin automatically with jittered back-off and resume.
 - Keep the screen awake while connected (`DisplayServer.screen_set_keep_on`). Respect safe areas (`DisplayServer.get_display_safe_area`). All touch targets at least 44 px.
-- Creatures show a **condition** (Healthy, Wounded, Badly wounded, Almost dead, Down) instead of numbers; heroes show exact HP. Reproduce `healthCondition` thresholds from `src/combat.js`.
+- Creatures show a **condition** (Healthy, Minor injury, Injured, Bloodied, Severely injured, Critically injured, Down) instead of numbers; heroes show exact HP. Reproduce `healthCondition` thresholds from `src/combat.js`.
 
 ### 4.3 Joining and admission
 

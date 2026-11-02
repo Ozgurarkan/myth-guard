@@ -47,11 +47,19 @@ export function TablePanel() {
       <Button variant="primary" block icon="qr-code" onClick={() => setSessionOpen(true)}>Invite players — address &amp; QR code</Button>
       <div className="panel-card panel-card--tight">
         <Switch checked={table?.codeRequired === true} onChange={() => sendTableCommand('entry', { required: table?.codeRequired !== true })}
-          label="Players need the QR code or table code" hint="Off: anyone on your Wi-Fi who opens the address can join. Turn on to ask for the code, or choose to approve each device first." />
+          label="Players need the QR code or table code" />
       </div>
       <div className="panel-card panel-card--tight">
         <Switch checked={state.playerCanMoveTokens} onChange={() => dispatch({ type: 'PV_TOGGLE_TOKEN_MOVE' })}
-          label="Players can move their own tokens" hint="Turn off for cutscenes or when the screen is a shared display." />
+          label="Players can move their own tokens" />
+      </div>
+      <div className="panel-card panel-card--tight">
+        <Switch checked={state.playerCanEditCombat !== false} onChange={() => dispatch({ type: 'PV_TOGGLE_COMBAT_EDIT' })}
+          label="Players can edit their hero in combat" />
+      </div>
+      <div className="panel-card panel-card--tight">
+        <Switch checked={state.playerCanCast !== false} onChange={() => dispatch({ type: 'PV_TOGGLE_CAST' })}
+          label="Players can cast spell areas" />
       </div>
 
       {waiting.length > 0 && (
@@ -69,7 +77,7 @@ export function TablePanel() {
       )}
 
       <PanelSection title="Players" count={people.length} action={people.length > 0 && <span className="table-online"><span className={`presence${onlineCount ? ' is-online' : ''}`} aria-hidden="true" />{onlineCount} online</span>}>
-        {people.length === 0 && <EmptyState icon="users" art="door" title="No one has arrived">Share the address from the button above. Players enter a name and appear here.</EmptyState>}
+        {people.length === 0 && <EmptyState icon="users" art="door" title="No one has arrived" />}
         <div className="player-cards">
           {people.map(person => {
             const owned = heroes.filter(token => token.ownerId === person.id);
@@ -104,9 +112,8 @@ export function TablePanel() {
 
       {heroes.length > 0 && (
         <PanelSection title="Only you control" count={unowned.length}>
-          {unowned.length === 0 ? <p className="panel-note">Every token has an owner.</p>
-            : <div className="chips">{unowned.map(token => <span key={token.id} className="chip is-static"><Avatar src={token.imageSrc} name={token.name} color={token.color} size={20} />{token.name || 'Unnamed'}</span>)}</div>}
-          <p className="panel-note">Players can only ever move tokens that are visible, outside the fog, and assigned to them. Save the scene to keep these assignments.</p>
+          {unowned.length > 0 &&
+            <div className="chips">{unowned.map(token => <span key={token.id} className="chip is-static"><Avatar src={token.imageSrc} name={token.name} color={token.color} size={20} />{token.name || 'Unnamed'}</span>)}</div>}
         </PanelSection>
       )}
     </div>

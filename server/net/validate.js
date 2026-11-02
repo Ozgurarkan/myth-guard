@@ -100,6 +100,45 @@ const VALIDATORS = {
     if (!isId(m.id) || !coord(m.x) || !coord(m.y)) return null;
     return { type: 'PLAYER_TOKEN_LIVE', id: m.id, x: m.x, y: m.y };
   },
+  PLAYER_COMBAT_EDIT(m) {
+    const aid = aidOf(m.aid);
+    if (aid === BAD || !isId(m.tokenId)) return null;
+    const out = { type: 'PLAYER_COMBAT_EDIT', tokenId: m.tokenId };
+    if (m.hp !== undefined) { if (!finite(m.hp) || Math.abs(m.hp) > 1e6) return null; out.hp = m.hp; }
+    if (m.initiative !== undefined) { if (!finite(m.initiative) || Math.abs(m.initiative) > 1e6) return null; out.initiative = m.initiative; }
+    if (m.maxHp !== undefined) { if (!finite(m.maxHp) || Math.abs(m.maxHp) > 1e6) return null; out.maxHp = m.maxHp; }
+    if (out.hp === undefined && out.initiative === undefined && out.maxHp === undefined) return null;
+    if (aid !== undefined) out.aid = aid;
+    return out;
+  },
+  PLAYER_DELAY_TURN(m) {
+    const aid = aidOf(m.aid);
+    if (aid === BAD || !isId(m.tokenId) || !isId(m.after)) return null;
+    const out = { type: 'PLAYER_DELAY_TURN', tokenId: m.tokenId, after: m.after };
+    if (aid !== undefined) out.aid = aid;
+    return out;
+  },
+  PLAYER_AREA_ADD(m) {
+    const aid = aidOf(m.aid);
+    if (aid === BAD || !isId(m.id) || !(m.shape === 'circle' || m.shape === 'rect' || m.shape === 'cone')) return null;
+    if (typeof m.color !== 'string' || !/^#[0-9a-fA-F]{6}$/.test(m.color)) return null;
+    const out = { type: 'PLAYER_AREA_ADD', id: m.id, shape: m.shape, color: m.color };
+    for (const key of ['x', 'y']) if (m[key] !== undefined) { if (!coord(m[key])) return null; out[key] = m[key]; }
+    for (const key of ['radius', 'width', 'height', 'angle', 'rotation']) if (m[key] !== undefined) { if (!finite(m[key]) || Math.abs(m[key]) > 1e6) return null; out[key] = m[key]; }
+    if (m.boundTo !== undefined) { if (!isId(m.boundTo)) return null; out.boundTo = m.boundTo; }
+    if (aid !== undefined) out.aid = aid;
+    return out;
+  },
+  PLAYER_AREA_REMOVE(m) {
+    const aid = aidOf(m.aid);
+    if (aid === BAD) return null;
+    const out = { type: 'PLAYER_AREA_REMOVE' };
+    if (m.all === true) out.all = true;
+    else if (isId(m.id)) out.id = m.id;
+    else return null;
+    if (aid !== undefined) out.aid = aid;
+    return out;
+  },
   PLAYER_END_TURN(m) {
     const aid = aidOf(m.aid);
     if (aid === BAD || !isId(m.tokenId)) return null;

@@ -9,15 +9,12 @@
  */
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { Button } from '../ui';
+import { cssColor, cssRgba } from '../theme';
 
 const CANVAS_PX = 320;
 const HANDLE_R = 10;
 const MIN_CROP_R = 20;
 const OUTPUT_PX = 256;
-// Konva/canvas cannot read CSS variables, so these mirror --accent / --accent-2 / --text-on-accent in tokens.css.
-const ACCENT = '#a58bff';
-const CYAN = '#4fd8ee';
-const INK = '#0d0a26';
 
 export default function ImageCropper({ src, onCrop, onCancel, shape = 'circle' }) {
   const isPortrait = shape === 'portrait';
@@ -56,6 +53,8 @@ export default function ImageCropper({ src, onCrop, onCancel, shape = 'circle' }
   useEffect(() => {
     if (!imgEl || (!circle && !box) || !imgRect || !canvasRef.current) return;
     const ctx = canvasRef.current.getContext('2d');
+    // a canvas cannot read CSS variables: take the current theme's --accent, --accent-2 and --text-on-accent
+    const ACCENT = cssColor('--accent', '#a58bff'), CYAN = cssColor('--accent-2', '#4fd8ee'), INK = cssColor('--text-on-accent', '#0d0a26');
     const { sx, sy, sw, sh } = imgRect;
     ctx.clearRect(0, 0, CANVAS_PX, CANVAS_PX);
     ctx.save(); ctx.globalAlpha = 0.3; ctx.drawImage(imgEl, sx, sy, sw, sh); ctx.restore();
@@ -97,7 +96,7 @@ export default function ImageCropper({ src, onCrop, onCancel, shape = 'circle' }
     thirds(x - r, y - r, r * 2, r * 2); ctx.restore();
     ctx.save(); ctx.strokeStyle = CYAN; ctx.lineWidth = 2.5; ctx.shadowColor = CYAN; ctx.shadowBlur = 10;
     ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.stroke(); ctx.restore();
-    ctx.save(); ctx.strokeStyle = 'rgba(79, 216, 238, 0.7)'; ctx.lineWidth = 1; ctx.beginPath();
+    ctx.save(); ctx.strokeStyle = cssRgba('--accent-2-rgb', 0.7, 'rgba(79, 216, 238, 0.7)'); ctx.lineWidth = 1; ctx.beginPath();
     ctx.moveTo(x - 12, y); ctx.lineTo(x + 12, y); ctx.moveTo(x, y - 12); ctx.lineTo(x, y + 12); ctx.stroke(); ctx.restore();
     handle(x + r, y);
   }, [imgEl, circle, box, imgRect, isPortrait]);
@@ -190,7 +189,6 @@ export default function ImageCropper({ src, onCrop, onCancel, shape = 'circle' }
       </div>
       <div className="dlg-cropper__bar">
         <canvas ref={previewRef} width={isPortrait ? 100 : 112} height={112} className={`dlg-cropper__preview${isPortrait ? ' is-portrait' : ''}`} role="img" aria-label="Preview of the crop" />
-        <p className="dlg-cropper__hint">Drag <strong>inside</strong> the {isPortrait ? 'frame' : 'circle'} to move it · drag the <strong>round handle</strong> to resize it.</p>
       </div>
       <div className="dlg-cropper__actions">
         <Button variant="ghost" icon="chevron-left" onClick={onCancel}>Back</Button>

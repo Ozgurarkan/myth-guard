@@ -1,0 +1,130 @@
+/* ════════════════════════════════════════════════════════════════════════════
+   Soft floating-card skin — shared parts
+   The look is a set of separate rounded cards and pills resting on the backdrop, with
+   depth from diffuse shadows and a faint top highlight instead of hard rules. This file
+   reshapes what components.css and dialogs.css define (both screens load it, after them).
+   The GM shell and panels are reshaped in skin-gm.css, the player HUD in skin-player.css:
+   each loads after the screen file it overrides. Every colour still comes from tokens.css,
+   and the radius scale lives there too.
+   ════════════════════════════════════════════════════════════════════════════ */
+:root {
+  --card-edge: rgb(var(--edge-rgb) / .11);          /* hairline around floating cards */
+  --card-edge-strong: rgb(var(--edge-rgb) / .22);   /* hairline around buttons and pills */
+  --gap: 14px;                                  /* breathing room between floating cards */
+}
+
+/* ── Small caps labels become quiet sentence-case text ────────────────────── */
+.eyebrow, .field__label, .section-head h3, .session__heading, .dlg-group__title, .rule__text { text-transform: none; letter-spacing: .01em; }
+.eyebrow { font-size: 12px; }
+.field__label { font-size: 12.5px; }
+.dlg-group__title { font-size: 12.5px; }
+.session__heading { font-size: 14px; }
+
+/* ── Logos: inline SVG, painted in the theme (src/brand.jsx). The box is the size the component was given unless a parent sets it. ── */
+.logo { display: block; width: var(--logo-size, 100%); height: var(--logo-size, 100%); line-height: 0; }
+.logo > svg { display: block; width: 100%; height: 100%; }
+.brand__mark .logo, .welcome__seal .logo, .gate__seal .logo { --logo-size: 100%; }
+@media (max-height: 520px) { .waiting__die .logo { --logo-size: 52px; } }
+
+/* ── Buttons: raised glass ────────────────────────────────────────────────────
+   A translucent body, a gloss band along the top, a bright inner top edge, a darker inner bottom edge and a soft
+   shadow underneath, so each one reads as a thick pane resting on the card. Hover lifts it, a press sinks it.
+   No backdrop-filter: buttons also float over the live map, so the glass is built from layered gradients. */
+.btn, .btn--secondary, .btn--sm, .btn--lg { border-radius: var(--radius-full); }
+.btn { position: relative; isolation: isolate; transition: background var(--dur-fast), border-color var(--dur-fast), color var(--dur-fast), box-shadow var(--dur), transform var(--dur-fast) var(--ease-out); }
+.btn:not(.btn--ghost)::before { content: ''; position: absolute; inset: 1px 3px 50% 3px; z-index: -1; border-radius: var(--radius-full) var(--radius-full) 40% 40%; background: linear-gradient(180deg, rgb(255 255 255 / .22), rgb(255 255 255 / .02)); pointer-events: none; }
+.btn:where(:not(.btn--primary, .btn--danger, .btn--ghost, .btn--heal)) {
+  border-color: var(--card-edge-strong);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--surface-3) 64%, transparent), color-mix(in srgb, var(--surface-2) 52%, transparent));
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / .2), inset 0 -2px 3px rgb(var(--shadow-rgb) / .35), 0 1px 0 rgb(var(--shadow-rgb) / .55), 0 6px 14px rgb(var(--shadow-rgb) / .32);
+}
+.btn:where(:not(.btn--primary, .btn--danger, .btn--ghost, .btn--heal)):hover:not(:disabled) {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--surface-4) 72%, transparent), color-mix(in srgb, var(--surface-3) 58%, transparent));
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / .28), inset 0 -2px 3px rgb(var(--shadow-rgb) / .3), 0 1px 0 rgb(var(--shadow-rgb) / .55), 0 10px 20px rgb(var(--shadow-rgb) / .38), 0 0 14px var(--accent-wash);
+  transform: translateY(-1px);
+}
+.btn:where(:not(.btn--primary, .btn--danger, .btn--ghost, .btn--heal)):active:not(:disabled) {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--surface-2) 75%, transparent), color-mix(in srgb, var(--surface-3) 55%, transparent));
+  box-shadow: inset 0 2px 5px rgb(var(--shadow-rgb) / .55), inset 0 1px 0 rgb(255 255 255 / .05), 0 1px 0 rgb(var(--hi-rgb) / .06);
+  transform: translateY(1px);
+}
+.btn--primary {
+  border-color: rgb(255 255 255 / .34);
+  background: linear-gradient(180deg, rgb(var(--fill-hi-rgb) / .94), rgb(var(--fill-rgb) / .88) 55%, rgb(var(--fill-lo-rgb) / .92));
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / .6), inset 0 -3px 5px rgb(var(--fill-deep-rgb) / .38), 0 1px 0 rgb(var(--fill-deep-rgb) / .5), 0 8px 18px rgb(var(--accent-lo-rgb) / .38);
+}
+.btn--primary::before { background: linear-gradient(180deg, rgb(255 255 255 / .42), rgb(255 255 255 / .04)); }
+.btn--primary:hover:not(:disabled) { background: linear-gradient(180deg, color-mix(in srgb, rgb(var(--fill-hi-rgb)) 75%, #fff 25%), color-mix(in srgb, rgb(var(--fill-rgb)) 85%, #fff 15%) 55%, color-mix(in srgb, rgb(var(--fill-lo-rgb)) 85%, #fff 15%)); border-color: rgb(255 255 255 / .5); box-shadow: inset 0 1px 0 rgb(255 255 255 / .7), inset 0 -3px 5px rgb(var(--fill-deep-rgb) / .32), 0 1px 0 rgb(var(--fill-deep-rgb) / .5), 0 12px 24px rgb(var(--accent-lo-rgb) / .45); transform: translateY(-1px); }
+.btn--primary:active:not(:disabled) { background: linear-gradient(180deg, rgb(var(--fill-rgb) / .92), rgb(var(--fill-lo-rgb) / .94)); box-shadow: inset 0 3px 6px rgb(var(--fill-deep-rgb) / .5), 0 1px 0 rgb(255 255 255 / .12); transform: translateY(1px); }
+.btn--danger, .btn--heal { box-shadow: inset 0 1px 0 rgb(255 255 255 / .16), inset 0 -2px 3px rgb(var(--shadow-rgb) / .3), 0 1px 0 rgb(var(--shadow-rgb) / .5), 0 6px 14px rgb(var(--shadow-rgb) / .3); }
+.btn--danger:active:not(:disabled), .btn--heal:active:not(:disabled) { box-shadow: inset 0 2px 5px rgb(var(--shadow-rgb) / .5); transform: translateY(1px); }
+.btn:disabled { box-shadow: none; transform: none; }
+.btn:disabled::before { opacity: .5; }
+.input { border-radius: 14px; box-shadow: var(--inset-soft); }
+.input:focus { box-shadow: var(--inset-soft), 0 0 0 3px var(--accent-2-wash); }
+.segmented { padding: 3px; gap: 2px; border-color: var(--card-edge-strong); border-radius: var(--radius-full); box-shadow: var(--inset-soft); }
+.segmented__item { border-radius: var(--radius-full); }
+.segmented__item + .segmented__item { border-left: 0; }
+.segmented__item.is-active { background: linear-gradient(180deg, rgb(255 255 255 / .16), rgb(255 255 255 / 0) 55%), var(--accent-wash-strong); box-shadow: inset 0 1px 0 rgb(255 255 255 / .28), inset 0 -2px 3px rgb(var(--shadow-rgb) / .25), 0 3px 8px var(--accent-wash); }
+.badge, .chip { border-color: var(--card-edge-strong); }
+.chip { background: linear-gradient(180deg, color-mix(in srgb, var(--surface-3) 64%, transparent), color-mix(in srgb, var(--surface-2) 52%, transparent)); box-shadow: inset 0 1px 0 rgb(255 255 255 / .16), inset 0 -1px 2px rgb(var(--shadow-rgb) / .3), 0 3px 8px rgb(var(--shadow-rgb) / .25); }
+.chip.is-active { background: linear-gradient(180deg, rgb(255 255 255 / .14), rgb(255 255 255 / 0) 55%), var(--accent-wash-strong); }
+.switch__track { box-shadow: var(--inset-soft); }
+
+/* Colour pickers (grid and fog colour in Settings, "Any colour" in the token dialog): the browser draws a square swatch inside the box.
+   Both get soft corners, the swatch's being the box's minus its padding so the two curves run parallel. */
+input[type='color'] { padding: 4px; border-radius: 14px; }
+input[type='color']::-webkit-color-swatch-wrapper { padding: 0; border-radius: 10px; }
+input[type='color']::-webkit-color-swatch { border: 0; border-radius: 10px; box-shadow: inset 0 0 0 1px rgb(255 255 255 / .22), inset 0 1px 3px rgb(var(--shadow-rgb) / .3); }
+input[type='color']::-moz-color-swatch { border: 0; border-radius: 10px; box-shadow: inset 0 0 0 1px rgb(255 255 255 / .22); }
+.dlg-custom-color input[type='color'] { padding: 3px; border-radius: 12px; }
+.dlg-custom-color input[type='color']::-webkit-color-swatch-wrapper, .dlg-custom-color input[type='color']::-webkit-color-swatch, .dlg-custom-color input[type='color']::-moz-color-swatch { border-radius: 9px; }
+
+/* ── Cards: rounded, softly lifted, no hard edge ──────────────────────────── */
+.card, .row, .dlg-group, .dlg-tile, .dlg-preview, .dlg-cropper__bar, .session__help { border-color: var(--card-edge); }
+.card, .dlg-group, .dlg-tile { border-radius: 20px; }
+.row, .session__help { border-radius: var(--radius-md); }
+.card { box-shadow: var(--highlight-inset), var(--shadow-1); }
+.empty-state, .dropzone { border-radius: 20px; }
+.dlg-tile__art { border-radius: var(--radius-md); }
+
+/* Section titles: large, calm, no underline accent */
+.section-head { margin: 26px 0 12px; padding-bottom: 0; border-bottom: 0; }
+.section-head::after { display: none; }
+.section-head h3 { font: var(--fw-semibold) 17px/1.2 var(--font-display); color: var(--text); }
+.dlg-group__title::after { display: none; }
+.dlg-group__title { color: var(--text-2); }
+.session__heading { color: var(--text); }
+
+/* ── Theme picker: a swatch per theme, the live one ringed ──────────────────── */
+.theme-picker { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: var(--space-2); }
+.theme-swatch {
+  display: flex; flex-direction: column; align-items: stretch; gap: 8px; padding: 8px 8px 9px; border: 1px solid var(--card-edge-strong); border-radius: 18px;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--surface-3) 64%, transparent), color-mix(in srgb, var(--surface-2) 52%, transparent));
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / .16), 0 4px 10px rgb(var(--shadow-rgb) / .25); color: var(--text-2); font: var(--fw-semibold) var(--fs-sm)/1 var(--font-body);
+  transition: border-color var(--dur-fast), box-shadow var(--dur), transform var(--dur-fast) var(--ease-out);
+}
+.theme-swatch:hover { transform: translateY(-1px); border-color: var(--accent); }
+.theme-swatch:active { transform: translateY(1px); }
+.theme-swatch.is-active { border-color: var(--accent); color: var(--text); box-shadow: inset 0 0 0 1px var(--accent), 0 6px 14px var(--accent-wash); }
+.theme-swatch__chip { position: relative; display: block; height: 44px; border-radius: 12px; overflow: hidden; background: var(--sw-0); box-shadow: inset 0 0 0 1px rgb(255 255 255 / .14); }
+.theme-swatch__chip i { position: absolute; border-radius: 50%; }
+.theme-swatch__chip i:nth-child(1) { left: 11px; top: 11px; width: 22px; height: 22px; background: var(--sw-1); box-shadow: 0 2px 6px rgb(0 0 0 / .35); }
+.theme-swatch__chip i:nth-child(2) { left: 40px; top: 17px; width: 14px; height: 14px; background: var(--sw-2); }
+.theme-swatch__label { text-align: center; }
+/* Compact: only round swatches, each half accent, half second accent (the player menu) */
+.theme-picker.is-compact { display: flex; flex-wrap: wrap; gap: 8px; }
+.theme-picker.is-compact .theme-swatch { width: var(--tap-min); height: var(--tap-min); padding: 0; border-radius: 50%; }
+.theme-picker.is-compact .theme-swatch__chip { width: 100%; height: 100%; border-radius: 50%; background: linear-gradient(135deg, var(--sw-1) 0 50%, var(--sw-2) 50% 100%); }
+.theme-picker.is-compact .theme-swatch__chip i, .theme-picker.is-compact .theme-swatch__label { display: none; }
+.theme-picker.is-compact .theme-swatch { border-width: 2px; border-color: var(--sw-0); }
+.theme-picker.is-compact .theme-swatch.is-active { border-color: var(--text); box-shadow: 0 0 0 2px var(--accent); }
+
+/* ── Modals and toasts ────────────────────────────────────────────────────── */
+.modal { border-color: var(--card-edge-strong); border-radius: var(--radius-xl); box-shadow: var(--shadow-3); }
+.modal__header { border-bottom-color: var(--card-edge); }
+.modal__header h2 { font-size: var(--fs-xl); font-weight: var(--fw-semibold); }
+.modal__header > .icon:first-child { border-radius: 50%; border-color: transparent; box-shadow: none; }
+.modal__footer { border-top-color: var(--card-edge); background: transparent; box-shadow: none; }
+.toast { border-radius: var(--radius-lg); border-color: var(--card-edge-strong); }
+@media (max-width: 560px) { .modal { border-radius: var(--radius-xl) var(--radius-xl) 0 0; } }

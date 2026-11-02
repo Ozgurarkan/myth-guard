@@ -60,7 +60,7 @@ export function Header() {
     <header className="header">
       <div className="brand">
         <span className="brand__mark"><LogoMark size={40} /></span>
-        <div className="brand__text"><span className="brand__name">Myth Guard</span><small>Game Master’s screen</small></div>
+        <div className="brand__text"><span className="brand__name">Myth Guard</span></div>
       </div>
 
       <button type="button" className="scene-chip" onClick={() => openPanel('scenes')} title="Open the scene library">

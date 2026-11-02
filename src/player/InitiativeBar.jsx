@@ -5,30 +5,30 @@
 //   * a landscape phone, tablet, laptop window or TV: a column down the left side (the map fits in the space that is left)
 // The same markup serves both; the stylesheet (player.css, "Turn order") decides the shape.
 import React, { useEffect, useRef, useState } from 'react';
-import { initiativeOrder, healthLabel, bloodLevel } from '../combat';
+import { turnOrder, delayedIds, healthLabel, healthCondition, bloodLevel } from '../combat';
 import { Icon, IconButton } from '../ui';
-import { DEFAULT_TOKEN_COLOR } from '../canvas/shared';
+import { SkullMark } from '../brand';
 
 const slug = text => text.toLowerCase().replace(/\s+/g, '-');
 
-/** Colour band for a combatant: creatures arrive as a condition word, heroes as hit points. */
+/** Colour band for a combatant: creatures arrive as a condition word, heroes as hit points; both use the same words. */
 function toneOf(entry) {
   if (entry.condition) return slug(entry.condition);
   if (!entry.maxHp) return '';
-  const fraction = entry.hp / entry.maxHp;
-  if (fraction <= 0) return 'down';
-  return fraction < 0.2 ? 'almost-dead' : fraction < 0.5 ? 'badly-wounded' : fraction < 0.8 ? 'wounded' : 'healthy';
+  return slug(healthCondition(entry));
 }
 
 function Portrait({ token, entry, active, mine }) {
   const damage = bloodLevel(entry);
-  const down = entry.hp === 0 || entry.condition === 'Down';
+  const dead = token.dead === true;
+  const down = !dead && (entry.hp === 0 || entry.condition === 'Down');
   const src = token.portraitSrc || token.imageSrc;
   return (
-    <div className={`portrait${active ? ' is-active' : ''}${down ? ' is-down' : ''}${mine ? ' is-mine' : ''}`} style={{ '--token-color': token.color || DEFAULT_TOKEN_COLOR }}>
+    <div className={`portrait${active ? ' is-active' : ''}${down ? ' is-down' : ''}${dead ? ' is-dead' : ''}${mine ? ' is-mine' : ''}`} style={{ '--token-color': token.color || 'var(--text-4)' }}>
       {src ? <img src={src} alt="" draggable={false} /> : <span className="portrait__initial">{(token.name || '?').slice(0, 2).toUpperCase()}</span>}
       <span className="portrait__blood" aria-hidden="true" style={{ opacity: damage * 0.55 }} />
-      {down && <span className="portrait__skull"><Icon name="skull" size={22} /></span>}
+      {dead && <span className="portrait__skull"><SkullMark size={34} /></span>}
+      {down && <span className="portrait__down">Down</span>}
       {mine && <span className="portrait__you">You</span>}
       <span className="portrait__init" aria-label={`Initiative ${entry.initiative}`}>{entry.initiative}</span>
     </div>
@@ -46,7 +46,8 @@ function centreOn(container, element) {
 export function InitiativeBar({ combat, tokens, playerId }) {
   const list = useRef(null);
   const [open, setOpen] = useState(false);          // the full list as a drop-down, on a phone held upright
-  const order = initiativeOrder(combat);
+  const order = turnOrder(combat);
+  const waiting = delayedIds(combat);
   const activeId = combat?.activeId;
   useEffect(() => {
     centreOn(list.current, list.current?.querySelector('[aria-current="step"]'));
@@ -82,6 +83,7 @@ export function InitiativeBar({ combat, tokens, playerId }) {
                 {!entry.condition && entry.maxHp ? <span className="p-initiative__hp" aria-hidden="true"><i style={{ '--hp': Math.max(0, Math.min(1, entry.hp / entry.maxHp)) }} /></span> : null}
               </span>
               {isActive && <span className="p-initiative__turn">Turn</span>}
+              {!isActive && waiting.includes(entry.tokenId) && <span className="p-initiative__waiting" title="Waiting: acts here this round, then goes back to the usual place">Waiting</span>}
             </li>
           );
         })}

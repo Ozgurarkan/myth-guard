@@ -10,7 +10,7 @@ const scene = () => ({
       ownerId: 'alice', characterType: 'pc', npcId: 7, notes: 'secret', visibleToPlayers: true },
     { id: 'ambusher', name: 'Hidden Assassin', x: 100, y: 0, gridSize: 1, visibleToPlayers: false, characterType: 'npc' },
     { id: 'fogged', name: 'Behind Fog', x: 500, y: 500, gridSize: 1, characterType: 'npc' },
-    { id: 'goblin', name: 'Goblin', x: 200, y: 0, gridSize: 1, characterType: 'npc' },
+    { id: 'goblin', name: 'Goblin', x: 200, y: 0, gridSize: 1, characterType: 'npc', showNumber: true, number: 2 },
   ],
   markers: [
     { id: 'm1', type: 'star', x: 1, y: 1, size: 10, color: '#fff', visibleToPlayers: true, label: 'Door' },
@@ -35,11 +35,42 @@ test('players never receive hidden or fogged tokens, hidden markers, or private 
   }
 });
 
+test('players are sent who cast an area and what a circle is bound to, but a circle bound to a hidden or fogged token is not sent at all', () => {
+  const view = projectForPlayers({
+    ...scene(),
+    areaEffects: [
+      { id: 'free', type: 'circle', x: 5, y: 6, radius: 50, color: '#e5533d', opacity: 0.4, ownerId: 'alice', gmNote: 'secret' },
+      { id: 'aura', type: 'circle', x: 0, y: 0, radius: 100, color: '#6fb4e8', opacity: 0.4, ownerId: 'alice', boundTo: 'hero' },
+      { id: 'hiddenAura', type: 'circle', x: 0, y: 0, radius: 100, color: '#fff000', ownerId: 'bob', boundTo: 'ambusher' },
+      { id: 'foggedAura', type: 'circle', x: 0, y: 0, radius: 100, color: '#fff000', ownerId: 'bob', boundTo: 'fogged' },
+      { id: 'goneAura', type: 'circle', x: 0, y: 0, radius: 100, color: '#fff000', ownerId: 'bob', boundTo: 'deleted' },
+    ],
+  });
+  assert.deepEqual(view.areaEffects.map(effect => effect.id), ['free', 'aura']);
+  assert.equal(view.areaEffects[1].boundTo, 'hero');
+  assert.equal(view.areaEffects[0].ownerId, 'alice');
+  const text = JSON.stringify(view);
+  for (const secret of ['gmNote', 'secret', 'ambusher', 'hiddenAura', 'foggedAura']) assert.equal(text.includes(secret), false, `${secret} leaked`);
+  assert.equal(view.playerCanCast, true);
+  assert.equal(projectForPlayers({ ...scene(), playerCanCast: false }).playerCanCast, false);
+});
+
+test('number badges stay on the GM screen: players are sent neither the switch nor the number', () => {
+  const view = projectForPlayers(scene());
+  const goblin = view.tokens.find(t => t.id === 'goblin');
+  assert.equal('showNumber' in goblin, false);
+  assert.equal('number' in goblin, false);
+  const text = JSON.stringify(view);
+  assert.equal(text.includes('showNumber'), false);
+  assert.equal(text.includes('"number"'), false);
+  assert.equal(goblin.name, 'Goblin', 'the name itself is untouched');
+});
+
 test('NPC hit points are reduced to conditions and hidden combatants vanish from initiative', () => {
   const { combat } = projectForPlayers(scene());
   assert.deepEqual(combat.entries.map(e => e.tokenId).sort(), ['goblin', 'hero']);
   assert.equal(combat.entries.find(e => e.tokenId === 'goblin').hp, undefined);
-  assert.equal(combat.entries.find(e => e.tokenId === 'goblin').condition, 'Badly wounded');
+  assert.equal(combat.entries.find(e => e.tokenId === 'goblin').condition, 'Bloodied');
   assert.equal(combat.entries.find(e => e.tokenId === 'hero').hp, 8);
   assert.equal(combat.round, 3);
 });
@@ -74,4 +105,12 @@ test('fog squares reach players as a set: a repeated square is sent once', () =>
   withRepeats.fogCells = ['1,1', '2,2', '1,1', '3,3', '2,2'];
   const view = projectForPlayers(withRepeats);
   assert.deepEqual(view.fogCells, ['1,1', '2,2', '3,3']);
+});
+
+test('a dead token is sent to players as dead (and a living one carries no such field)', () => {
+  const base = scene();
+  const tokens = base.tokens.map(token => (token.id === 'goblin' ? { ...token, dead: true } : token));
+  const { tokens: seen } = projectForPlayers({ ...base, tokens });
+  assert.equal(seen.find(token => token.id === 'goblin').dead, true);
+  assert.equal('dead' in seen.find(token => token.id === 'hero'), false);
 });

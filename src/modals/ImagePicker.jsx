@@ -70,7 +70,6 @@ export default function ImagePicker() {
   return (
     <Modal title="Show an image to the players" icon="images" width={820} onClose={close}
       footer={<>
-        <span className="dlg-hint">Click an image to put it on every player’s screen.</span>
         <Button variant="ghost" onClick={close}>Cancel</Button>
       </>}>
       <div className="dlg-picker__bar">
@@ -78,7 +77,7 @@ export default function ImagePicker() {
         <label className={`btn btn--primary dlg-file${busy ? ' is-busy' : ''}`}><Icon name="upload" size={17} /><span className="btn__label">{busy ? 'Saving…' : 'Add from computer'}</span>
           <input type="file" accept="image/*" multiple onChange={addFiles} disabled={busy} /></label>
       </div>
-      {loaded && images.length === 0 && <EmptyState icon="images" title="Your library is empty">Use “Add from computer”. Images you add stay here, so next session you can reveal them in one click.</EmptyState>}
+      {loaded && images.length === 0 && <EmptyState icon="images" title="Your library is empty" />}
       {images.length > 0 && visible.length === 0 && <EmptyState icon="search">No image matches “{filter}”.</EmptyState>}
       <div className="dlg-picker__grid">
         {visible.map(entry => {

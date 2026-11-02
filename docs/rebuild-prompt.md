@@ -90,7 +90,7 @@ GM-only state (never in the scene): selection, tool, pan/zoom, open panels, note
 
 ### Token
 `id, name, x, y, gridSize (0.5, 1, 2, 3, 4 squares), characterType ('pc' | 'npc'), color (ring colour hex), borderWidth (2-20), imageSrc (cropped circle), portraitSrc (initiative portrait), portraitSource (uncropped original, GM only), showNumber/number (badge), visibleToPlayers, ownerId (the player device that may move it), maxHp (optional, saved on the token), npcId, notes (GM only), category`.
-- A **hero** (`pc`) shows players exact hit points. A **creature/NPC** shows players only a **condition**: Healthy (full), Wounded (<100%), Badly wounded (<=50%), Almost dead (<=25%), Down (0). Exact numbers never leave the server.
+- A **hero** (`pc`) shows players exact hit points. A **creature/NPC** shows players only a **condition**: Healthy (100%), Minor injury (>75%), Injured (>50%), Bloodied (<=50%), Severely injured (<25%), Critically injured (<=10%), Down (0). Exact numbers never leave the server.
 - `maxHp` set in the token form is used automatically when the token joins combat (starts at full health); editing "HP max" inside combat is remembered on the token.
 
 ### Combat

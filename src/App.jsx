@@ -10,6 +10,7 @@ import { subscribeGM, sendGmMessage } from './broadcast';
 import { withGmAudio } from './audio/audioChannel';
 import { emitPing } from './pings';
 import { emitTokenLive } from './liveTokens';
+import { playerEffect } from './areas';
 import { AudioProvider } from './audio/AudioProvider';
 import { ToastHost, ConfirmHost, toast } from './ui';
 import { WorkspaceCtx } from './gm/workspace';
@@ -51,6 +52,28 @@ function Inner() {
       onTokenMove: (id, x, y) => dispatch({ type: 'TOKEN_MOVE', id, x, y }),
       onPing: emitPing,
       onTokenLive: emitTokenLive,
+      // The server already checked this is that player's hero and that the GM allows it; this window owns the scene, so it re-checks.
+      // A hero waits until after another combatant: only on their own turn (the reducer re-checks the order).
+      onDelayTurn: ({ playerId, tokenId, after }) => {
+        const current = latest.current;
+        const token = current.tokens.find(t => t.id === tokenId);
+        if (!token || token.ownerId !== playerId || current.combat?.activeId !== tokenId) return;
+        dispatch({ type: 'COMBAT_DELAY', tokenId, after });
+      },
+      // A player's spell area, or a circle bound to their hero. The server has checked it; this window owns the scene, so it re-checks with the same rules.
+      onAreaAdd: ({ playerId, ...request }) => {
+        const current = latest.current;
+        if (current.playerCanCast === false || !current.tokens.some(token => token.ownerId === playerId && token.visibleToPlayers !== false)) return;
+        const made = playerEffect(request, current, playerId);
+        if (made.effect) dispatch({ type: 'AREA_PLAYER_ADD', effect: made.effect });
+      },
+      onAreaRemove: ({ playerId, id, all }) => dispatch({ type: 'AREA_PLAYER_REMOVE', playerId, id, all: all === true }),
+      onCombatEdit: ({ playerId, tokenId, hp, maxHp, initiative }) => {
+        const current = latest.current;
+        const token = current.tokens.find(t => t.id === tokenId);
+        if (!token || token.ownerId !== playerId || current.playerCanEditCombat === false) return;
+        dispatch({ type: 'COMBAT_PATCH', tokenId, hp, maxHp, initiative });
+      },
       // The server already checked it is that hero's turn; this window has the final say, because it owns the order.
       onEndTurn: ({ playerId, tokenId }) => {
         const current = latest.current;

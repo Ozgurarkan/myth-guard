@@ -8,7 +8,7 @@
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { withPlayerAudio } from './audio/audioChannel';
-import { subscribePlayer, sendPlayerMessage, sendPlayerTokenMove, sendPlayerPing, sendPlayerEndTurn, setPlayerName, getPlayerName, joinWithCode, retryPlayerConnection, getPlayerNetStats } from './broadcast';
+import { subscribePlayer, sendPlayerMessage, sendPlayerTokenMove, sendPlayerPing, sendPlayerEndTurn, sendPlayerCombatEdit, sendPlayerDelayTurn, setPlayerName, getPlayerName, joinWithCode, retryPlayerConnection, getPlayerNetStats, sendPlayerAreaAdd, sendPlayerAreaRemove } from './broadcast';
 import { emitPing } from './pings';
 import { emitTokenLive } from './liveTokens';
 import { usePlayerAudio } from './audio/usePlayerAudio';
@@ -18,7 +18,14 @@ import ImageViewer from './modals/ImageViewer';
 import PlayerMap from './player/PlayerMap';
 import { InitiativeBar } from './player/InitiativeBar';
 import { PlayerTools } from './player/PlayerTools';
+import { HeroSheet } from './player/HeroSheet';
+import { DelaySheet } from './player/DelaySheet';
+import { delayTargets, delayedIds } from './combat';
+import { effectsOf, PLAYER_AREA_COLORS } from './areas';
+import { SpellSheet, SIZE_FIELD } from './player/SpellSheet';
+import { ftToPx, areaSizeLabel, nanoid } from './utils';
 import { JoinGate } from './player/JoinGate';
+import { ThemePicker } from './ThemePicker';
 import { TableScreen, screenFor } from './player/TableScreens';
 import { NetDebug } from './NetDebug';
 
@@ -26,6 +33,17 @@ const MOVE_MESSAGES = {
   paused: 'The Dungeon Master has paused movement for now.',
   away: 'The Dungeon Master has stepped away.',
   blocked: 'That token can’t be moved right now.',
+};
+const EDIT_MESSAGES = {
+  paused: 'The Dungeon Master has switched editing off for now.',
+  away: 'The Dungeon Master has stepped away.',
+  blocked: 'That change can’t be made right now.',
+};
+const AREA_MESSAGES = {
+  paused: 'The Dungeon Master has switched spell casting off for now.',
+  away: 'The Dungeon Master has stepped away.',
+  blocked: 'You need a hero on the map to cast.',
+  invalid: 'That spell area couldn’t be placed.',
 };
 const TURN_MESSAGES = {
   away: 'The Dungeon Master has stepped away.',
@@ -116,8 +134,11 @@ export default function PlayerApp() {
   const [dismissed, setDismissed] = useState(null);
   const [zoom, setZoom] = useState(1);
   const [fullscreen, setFullscreen] = useState(false);
-  const [tool, setTool] = useState(null);            // null, 'ping' or 'measure'
+  const [tool, setTool] = useState(null);            // null, 'ping', 'measure' or 'spell'
+  const [spell, setSpell] = useState({ shape: 'circle', color: PLAYER_AREA_COLORS[0], radiusFt: 20, sideFt: 20, lengthFt: 30, angle: 60 });
   const [endingTurn, setEndingTurn] = useState(false);
+  const [heroOpen, setHeroOpen] = useState(false);
+  const [delayOpen, setDelayOpen] = useState(false);
   const mapRef = useRef(null);
   const focused = useRef(false);
   const { state: audio, enable } = usePlayerAudio();
@@ -156,6 +177,8 @@ export default function PlayerApp() {
     onLatency: setLatency,
     onPing: emitPing,
     onTokenLive: emitTokenLive,
+    onEditRejected: ({ reason }) => toast(EDIT_MESSAGES[reason] || EDIT_MESSAGES.blocked, { tone: 'warning' }),
+    onAreaRejected: ({ reason }) => toast(AREA_MESSAGES[reason] || AREA_MESSAGES.blocked, { tone: 'warning' }),
     onTurnRejected: ({ reason }) => { setEndingTurn(false); toast(TURN_MESSAGES[reason] || TURN_MESSAGES['not-your-turn'], { tone: 'warning' }); },
     onMoveRejected: ({ id, reason }) => {
       setPending(current => { const next = { ...current }; delete next[id]; return next; });
@@ -173,7 +196,10 @@ export default function PlayerApp() {
 
   // "End turn" stays greyed out until the order moves on; a lost reply must not leave it stuck.
   const activeTurn = ps?.combat?.activeId ?? null;
-  useEffect(() => { setEndingTurn(false); }, [activeTurn]);
+  useEffect(() => { setEndingTurn(false); setDelayOpen(false); }, [activeTurn]);
+  // Casting needs a hero of your own on the map and the GM's say-so; if it is switched off while the tool is on, the tool goes away.
+  const canCast = !!ps && !!playerId && ps.playerCanCast !== false && ps.tokens.some(token => token.ownerId === playerId);
+  useEffect(() => { if (!canCast) setTool(current => (current === 'spell' ? null : current)); }, [canCast]);
   useEffect(() => {
     if (!endingTurn) return undefined;
     const timer = setTimeout(() => setEndingTurn(false), 2500);
@@ -229,7 +255,26 @@ export default function PlayerApp() {
   const handout = ps.handoutSrc ? { src: ps.handoutSrc, name: ps.handoutName } : null;
   const handoutHidden = handout && dismissed === handout.src;
   const myTurn = !!ps.combat?.activeId && mine.some(token => token.id === ps.combat.activeId);
-  const chooseTool = name => setTool(current => (current === name ? null : name));
+  const chooseTool = name => {
+    if (name === 'spell') { setHeroOpen(false); setDelayOpen(false); }
+    setTool(current => (current === name ? null : name));
+  };
+  // Spell areas. Sizes are chosen in feet and sent in map pixels; the table clamps them to what the grid allows.
+  const mySpells = effectsOf(ps.areaEffects, playerId);
+  const sizeOf = shape => ftToPx(spell[SIZE_FIELD[shape].key], ps.gridSize, ps.feetPerCell);
+  const spellDraw = tool === 'spell' ? { type: spell.shape, color: spell.color, radius: sizeOf(spell.shape), width: sizeOf('rect'), height: sizeOf('rect'), angle: spell.angle } : null;
+  const castFields = () => ({ id: nanoid(), shape: spell.shape, color: spell.color,
+    ...(spell.shape === 'rect' ? { width: sizeOf('rect'), height: sizeOf('rect') } : { radius: sizeOf(spell.shape) }), ...(spell.shape === 'cone' ? { angle: spell.angle } : {}) });
+  const cast = ({ x, y, rotation }) => {
+    const fields = castFields();
+    // a square is placed by its middle, but stored by its corner like the GM's
+    const at = spell.shape === 'rect' ? { x: x - fields.width / 2, y: y - fields.height / 2 } : { x, y };
+    if (!sendPlayerAreaAdd({ ...fields, ...at, ...(spell.shape === 'cone' ? { rotation } : {}) })) toast('You’re offline — the spell didn’t reach the table.', { tone: 'danger' });
+  };
+  const bindCircle = hero => {
+    if (!sendPlayerAreaAdd({ ...castFields(), shape: 'circle', boundTo: hero.id })) toast('You’re offline — the spell didn’t reach the table.', { tone: 'danger' });
+  };
+  const takeBack = fields => { if (!sendPlayerAreaRemove(fields)) toast('You’re offline — that didn’t reach the table.', { tone: 'danger' }); };
   const ping = (x, y) => {
     if (!sendPlayerPing(x, y)) toast('You’re offline — the ping didn’t reach the table.', { tone: 'danger' });
     setTool(null);   // one tap, one ping
@@ -238,6 +283,22 @@ export default function PlayerApp() {
     if (!myTurn) return;
     if (!sendPlayerEndTurn(ps.combat.activeId)) { toast('You’re offline — your turn wasn’t ended.', { tone: 'danger' }); return; }
     setEndingTurn(true);
+  };
+  // your heroes that are in the fight: their hit points and initiative can be changed from the Hero card
+  const fighting = mine.map(token => ({ token, entry: ps.combat?.entries.find(item => item.tokenId === token.id) })).filter(item => item.entry);
+  const canEdit = open && gmPresent !== false && ps.playerCanEditCombat !== false;
+  const editHero = (tokenId, fields) => {
+    if (!sendPlayerCombatEdit(tokenId, fields)) toast('You’re offline — the change didn’t reach the table.', { tone: 'danger' });
+  };
+  // Delay: on your hero's turn, wait until after another hero who comes later this round (once a round). Creatures are never offered.
+  const activeHero = myTurn ? mine.find(token => token.id === ps.combat.activeId) : null;
+  const delayChoices = activeHero ? delayTargets(ps.combat, ps.tokens, activeHero.id).map(entry => ({ entry, token: ps.tokens.find(t => t.id === entry.tokenId) })) : [];
+  const alreadyDelayed = !!activeHero && delayedIds(ps.combat).includes(activeHero.id);
+  const delayTitle = !myTurn ? 'You can delay when it is your turn' : alreadyDelayed ? 'You already delayed this round' : delayChoices.length ? 'Delay your turn until after another hero' : 'No other hero comes later this round';
+  const chooseDelay = afterId => {
+    if (!activeHero) return;
+    if (!sendPlayerDelayTurn(activeHero.id, afterId)) { toast('You’re offline — your delay didn’t reach the table.', { tone: 'danger' }); return; }
+    setDelayOpen(false);
   };
   const blankTable = !ps.mapImageSrc && ps.tokens.length === 0;
   const findHero = () => {
@@ -251,7 +312,7 @@ export default function PlayerApp() {
     <div className={`player-page${TV ? ' is-tv' : ''}`} data-turns={turnLayout}>
       <InitiativeBar combat={ps.combat} tokens={ps.tokens} playerId={playerId} />
       <div className="p-stage">
-      <PlayerMap ref={mapRef} ps={ps} playerId={playerId} canMove={canMove} pending={pending} tool={tool} onPing={ping} onMoveToken={moveToken} onZoomChange={setZoom} />
+      <PlayerMap ref={mapRef} ps={ps} playerId={playerId} canMove={canMove} pending={pending} tool={tool} spell={spellDraw} onPing={ping} onCast={cast} onMoveToken={moveToken} onZoomChange={setZoom} />
       <div className="p-top">
         <div className="p-top__row">
           <div className="p-top__right">
@@ -277,12 +338,23 @@ export default function PlayerApp() {
           <button type="button" role="menuitem" onClick={() => { setRenaming(true); setMenuOpen(false); }}><Icon name="pencil" size={17} /> Change name</button>
           {document.documentElement.requestFullscreen && <button type="button" role="menuitem" onClick={() => { toggleFullscreen(); setMenuOpen(false); }}><Icon name={fullscreen ? 'minimize' : 'maximize'} size={17} /> {fullscreen ? 'Leave full screen' : 'Full screen'}</button>}
           {handout && <button type="button" role="menuitem" onClick={() => { setDismissed(null); setMenuOpen(false); }}><Icon name="images" size={17} /> Show the handout</button>}
+          <div className="p-menu__theme"><span className="eyebrow">Theme</span><ThemePicker compact /></div>
           <p className="p-menu__note">{open ? (latency ? `Connection: ${latency} ms` : 'Connected') : 'Reconnecting…'}</p>
         </div>
         </>
       )}
 
-      <PlayerTools tool={tool} onTool={chooseTool} canEndTurn={myTurn} endingTurn={endingTurn} onEndTurn={endTurn} />
+      <PlayerTools tool={tool} onTool={chooseTool} canEndTurn={myTurn} endingTurn={endingTurn} onEndTurn={endTurn}
+        spell={canCast}
+        hero={fighting.length ? { open: heroOpen, onToggle: () => { setHeroOpen(value => !value); setDelayOpen(false); setTool(current => (current === 'spell' ? null : current)); } } : null}
+        delay={fighting.length ? { open: delayOpen && myTurn, enabled: myTurn && !alreadyDelayed && delayChoices.length > 0 && !endingTurn, title: delayTitle, onToggle: () => { setDelayOpen(value => !value); setHeroOpen(false); setTool(current => (current === 'spell' ? null : current)); } } : null} />
+      {tool === 'spell' && canCast && (
+        <SpellSheet spell={spell} onChange={patch => setSpell(current => ({ ...current, ...patch }))} heroes={mine} mine={mySpells}
+          describe={effect => areaSizeLabel(effect, ps.gridSize, ps.feetPerCell)} nameOf={id => ps.tokens.find(token => token.id === id)?.name || 'a hero'}
+          onBind={bindCircle} onRemove={id => takeBack({ id })} onClear={() => takeBack({ all: true })} onClose={() => setTool(null)} />
+      )}
+      {delayOpen && activeHero && <DelaySheet choices={delayChoices} onChoose={chooseDelay} onClose={() => setDelayOpen(false)} />}
+      {heroOpen && fighting.length > 0 && <HeroSheet heroes={fighting} canEdit={canEdit} onEdit={editHero} onClose={() => setHeroOpen(false)} />}
 
       <div className="p-bottom">
         <div className="p-bottom__left">
@@ -292,8 +364,9 @@ export default function PlayerApp() {
         <div className="p-bottom__right">
           {tool === 'ping' && <span className="p-hint"><Icon name="crosshair" size={14} /> Tap the map to ping</span>}
           {tool === 'measure' && <span className="p-hint"><Icon name="ruler" size={14} /> Drag on the map to measure</span>}
+          {tool === 'spell' && <span className="p-hint"><Icon name="wand-sparkles" size={14} /> {spell.shape === 'cone' ? 'Press the tip, drag to aim, release' : 'Press, drag to place, release'}</span>}
           {!blankTable && canMove && mine.length === 0 && <span className="p-hint"><Icon name="info" size={14} /> Ask the GM to give you a hero</span>}
-          {!blankTable && canMove && mine.length > 0 && <span className="p-hint"><Icon name="hand" size={14} /> Drag your hero to move</span>}
+          {!blankTable && canMove && mine.length > 0 && !tool && <span className="p-hint"><Icon name="hand" size={14} /> Drag your hero to move</span>}
           {!blankTable && ps.playerCanMoveTokens === false && <span className="p-hint is-warn"><Icon name="lock" size={14} /> Movement paused</span>}
         </div>
         <div className="p-zoom" role="group" aria-label="Map controls">

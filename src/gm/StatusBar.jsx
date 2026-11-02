@@ -6,14 +6,6 @@ import { Icon } from '../ui';
 const TOOL_NAMES = {
   select: 'Select', pan: 'Pan', marker: 'Marker', fog: 'Hide with fog', fogErase: 'Reveal', areaCircle: 'Circle spell', areaRect: 'Square spell', areaCone: 'Cone spell',
 };
-const HINTS = {
-  select: 'Drag tokens to move them · Right-click for more · Delete removes the selection',
-  pan: 'Drag to move around the map',
-  marker: 'Click the map to place a marker',
-  fog: 'Drag across the map to hide it from players',
-  fogErase: 'Drag across the map to reveal it to players',
-  areaCircle: 'Drag from the centre outward', areaRect: 'Drag from one corner to the other', areaCone: 'Drag from the tip outward',
-};
 
 export function StatusBar() {
   const { state } = useGM();
@@ -22,7 +14,6 @@ export function StatusBar() {
   return (
     <footer className="status-bar">
       <span className="status-item"><b>{TOOL_NAMES[state.activeTool] ?? state.activeTool}</b></span>
-      <span className="status-item status-item--hint">{HINTS[state.activeTool]}</span>
       <span className="status-spacer" />
       <span className="status-item"><span className="status-label">Zoom</span> {Math.round(stageScale * 100)}%</span>
       <span className="status-item"><span className="status-label">Grid</span> {state.gridSize}px</span>

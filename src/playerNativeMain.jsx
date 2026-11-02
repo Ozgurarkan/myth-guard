@@ -1,11 +1,16 @@
 import React, { useState } from 'react';
 import ReactDOM from 'react-dom/client';
+import '@fontsource-variable/outfit/wght.css';
 import '@fontsource-variable/cormorant/wght.css';
 import '@fontsource-variable/inter/wght.css';
 import './styles/tokens.css';
+import './styles/themes.css';
+import './theme';
 import './styles/components.css';
 import './styles/dialogs.css';
 import './styles/player.css';
+import './styles/skin.css';
+import './styles/skin-player.css';
 import PlayerApp from './PlayerApp.jsx';
 import { playerServerUrl, setPlayerServerUrl } from './net/playerServer.js';
 

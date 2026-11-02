@@ -1,4 +1,5 @@
 import { emptyCombat, normalizeCombat, reduceCombat } from './combat.js';
+import { addPlayerEffect, removePlayerEffects } from './areas.js';
 import { createContext, useContext, useReducer, useEffect } from 'react';
 import { nanoid } from './utils';
 import { broadcastState } from './broadcast';
@@ -61,6 +62,10 @@ const INITIAL = {
   playerViewRect: { x: 100, y: 100, width: 800, height: 600 },
   // Players may drag tokens around on the player window
   playerCanMoveTokens: true,
+  // ...and change the hit points and initiative of their own heroes while a fight is running
+  playerCanEditCombat: true,
+  // ...and cast spell areas, and circles bound to their heroes
+  playerCanCast: true,
 
   activeTool: 'select',
 
@@ -176,6 +181,8 @@ function reducer(state, action) {
         activeSheetId: state.activeSheetId, sheetLayout: state.sheetLayout,
         sheetDockWidth: state.sheetDockWidth,
         playerCanMoveTokens: state.playerCanMoveTokens,
+        playerCanEditCombat: state.playerCanEditCombat,
+        playerCanCast: state.playerCanCast,
         net: state.net,
         rightTab: state.rightTab,
       };
@@ -200,6 +207,8 @@ function reducer(state, action) {
         sheetLayout:    state.sheetLayout,
         sheetDockWidth: state.sheetDockWidth,
         playerCanMoveTokens: state.playerCanMoveTokens,
+        playerCanEditCombat: state.playerCanEditCombat,
+        playerCanCast: state.playerCanCast,
         net: state.net,
         rightTab: state.rightTab,
       };
@@ -223,6 +232,7 @@ function reducer(state, action) {
       return {
         ...state,
         tokens: state.tokens.filter(t => t.id !== action.id),
+        areaEffects: state.areaEffects.filter(effect => effect.boundTo !== action.id),   // a circle bound to it goes with it
         combat: reduceCombat(state.combat, { type: 'COMBAT_REMOVE', id: action.id }, state.tokens),
         selectedId: state.selectedId === action.id ? null : state.selectedId,
         contextMenu: null,
@@ -236,6 +246,17 @@ function reducer(state, action) {
         contextMenu: null,
       };
     }
+    case 'TOKEN_TOGGLE_DEAD':
+      // Dead belongs to the token, not to the fight: it is still there (grey, with a skull) when combat ends.
+      return {
+        ...state,
+        tokens: state.tokens.map(t => {
+          if (t.id !== action.id) return t;
+          const { dead: _was, ...rest } = t;
+          return t.dead === true ? rest : { ...rest, dead: true };
+        }),
+        contextMenu: null,
+      };
     case 'TOKEN_TOGGLE_PLAYER_VISIBLE':
       return {
         ...state,
@@ -311,6 +332,11 @@ function reducer(state, action) {
       return { ...state, areaEffects: state.areaEffects.map(e => e.id === action.id ? { ...e, x: action.x, y: action.y } : e) };
     case 'AREA_UPDATE':
       return { ...state, areaEffects: state.areaEffects.map(e => e.id === action.effect.id ? { ...e, ...action.effect } : e), contextMenu: null };
+    // A player's spell area (already checked by the table) and taking one back; src/areas.js has the rules for replacing and limiting them
+    case 'AREA_PLAYER_ADD':
+      return { ...state, areaEffects: addPlayerEffect(state.areaEffects, action.effect) };
+    case 'AREA_PLAYER_REMOVE':
+      return { ...state, areaEffects: removePlayerEffects(state.areaEffects, action.playerId, { id: action.id, all: action.all === true }) };
     case 'AREA_DELETE':
       return {
         ...state,
@@ -352,6 +378,10 @@ function reducer(state, action) {
       return { ...state, playerViewEnabled: !state.playerViewEnabled };
     case 'PV_TOGGLE_TOKEN_MOVE':
       return { ...state, playerCanMoveTokens: !state.playerCanMoveTokens };
+    case 'PV_TOGGLE_COMBAT_EDIT':
+      return { ...state, playerCanEditCombat: state.playerCanEditCombat === false };
+    case 'PV_TOGGLE_CAST':
+      return { ...state, playerCanCast: state.playerCanCast === false };
     case 'PV_SET_RECT':
       return { ...state, playerViewRect: action.rect };
 

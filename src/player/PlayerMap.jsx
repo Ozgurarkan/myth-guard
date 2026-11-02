@@ -4,15 +4,18 @@
 // can zoom into it and look around inside it, but never beyond its edges, so
 // nothing the GM kept out of frame is revealed by dragging the map.
 //
-// Two tools work on the map itself: PING (tap once to show everyone a spot) and MEASURE
-// (drag to see the distance; it stays on this phone and is never sent anywhere).
+// Three tools work on the map itself: PING (tap once to show everyone a spot), MEASURE (drag to see the distance; it stays on
+// this phone and is never sent anywhere) and SPELL (press where it goes, drag to move it or, for a cone, to aim it, release to cast).
+// Circles a player bound to a hero are drawn inside that hero's token, so they follow it.
 import React, { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import Konva from 'konva';
 import { Stage, Layer, Image as KImg, Rect, Group, Line, Circle, Text } from 'react-konva';
 import useImage from 'use-image';
 import { canPlayerMoveToken } from '../ownership.js';
 import { snapTo, clamp } from '../utils';
-import { GridLines, FogCells, TokenArt, MarkerShape, AreaFill, Pings, useMapProxy, useInteracting, useFontsVersion, CYAN, INK, INK_STROKE, FONT_BODY, SURFACE_1 } from '../canvas/shared';
+import { GridLines, FogCells, TokenArt, MarkerShape, AreaFill, Pings, useMapProxy, useInteracting, useFontsVersion, areaShape, CYAN, INK, INK_STROKE, FONT_BODY, SURFACE_1 } from '../canvas/shared';
+import { aurasByToken, freeEffects } from '../areas';
+import { useThemeVersion } from '../theme';
 import { usePings } from '../pings';
 import { useTokenLive, createLiveSender } from '../liveTokens';
 import { sendPlayerTokenLive } from '../broadcast';
@@ -60,7 +63,7 @@ function MeasureOverlay({ measure, gridSize, feetPerCell, snapped, scale }) {
   );
 }
 
-const PlayerMap = React.forwardRef(function PlayerMap({ ps, playerId, canMove, pending, tool = null, onPing, onMoveToken, onZoomChange }, ref) {
+const PlayerMap = React.forwardRef(function PlayerMap({ ps, playerId, canMove, pending, tool = null, spell = null, onPing, onCast, onMoveToken, onZoomChange }, ref) {
   const wrapRef = useRef(null);
   const stageRef = useRef(null);
   const pinch = useRef(null);
@@ -70,10 +73,15 @@ const PlayerMap = React.forwardRef(function PlayerMap({ ps, playerId, canMove, p
   const mapProxy = useMapProxy(mapImg);
   const [moving, poke] = useInteracting();
   const fonts = useFontsVersion();
+  const theme = useThemeVersion();   // PlayerToken is memoised: this repaints it in the new colours
   const pings = usePings();
   const [measure, setMeasure] = useState(null);   // { a, b, live } in map coordinates
+  const [draft, setDraft] = useState(null);       // a spell being placed: { x, y, rotation } in map coordinates
+  const spellOn = tool === 'spell' && !!spell;
+  const auras = useMemo(() => aurasByToken(ps.areaEffects), [ps.areaEffects]);
   const lastTap = useRef(0);
   useEffect(() => { if (tool !== 'measure') setMeasure(null); }, [tool]);
+  useEffect(() => { if (!spellOn) setDraft(null); }, [spellOn]);
 
   const rect = useMemo(() => ps.playerViewRect ?? { x: 0, y: 0, width: ps.mapWidth, height: ps.mapHeight }, [ps.playerViewRect, ps.mapWidth, ps.mapHeight]);
 
@@ -152,6 +160,34 @@ const PlayerMap = React.forwardRef(function PlayerMap({ ps, playerId, canMove, p
     if (point) setMeasure(current => (current ? { ...current, b: snapPoint(point) } : current));
   };
   const measureUp = () => setMeasure(current => (current?.live ? { ...current, live: false } : current));
+
+  // ── Spell ──
+  // Press puts the shape down, dragging moves it (a cone stays on its tip and turns to face the finger), release casts it.
+  const spellAt = point => (ps.snapToGrid ? { x: snapTo(point.x, ps.gridSize), y: snapTo(point.y, ps.gridSize) } : point);
+  const spellDown = event => {
+    if (!spellOn) return;
+    if (event.evt.touches && event.evt.touches.length > 1) { setDraft(null); return; }   // two fingers are a pinch
+    const point = pointOnMap();
+    if (point) setDraft({ ...spellAt(point), rotation: 0 });
+  };
+  const spellMove = event => {
+    if (!spellOn || !draft) return;
+    if (event.evt.touches && event.evt.touches.length > 1) return;
+    const point = pointOnMap();
+    if (!point) return;
+    if (spell.type === 'cone') {
+      const dx = point.x - draft.x, dy = point.y - draft.y;
+      if (Math.hypot(dx, dy) > 8 / current.scale) setDraft(now => (now ? { ...now, rotation: (Math.atan2(dy, dx) * 180) / Math.PI } : now));
+    } else {
+      setDraft(now => (now ? { ...now, ...spellAt(point) } : now));
+    }
+  };
+  const spellUp = () => {
+    if (!spellOn || !draft) return;
+    const placed = draft;
+    setDraft(null);
+    onCast?.(placed);
+  };
   const onStageTap = () => {
     if (tool !== 'ping') return;
     const now = Date.now();
@@ -164,7 +200,7 @@ const PlayerMap = React.forwardRef(function PlayerMap({ ps, playerId, canMove, p
   // Two fingers: zoom and pan together
   const onTouchMove = event => {
     const touches = event.evt.touches;
-    if (touches.length === 1) { measureMove(event); return; }
+    if (touches.length === 1) { measureMove(event); spellMove(event); return; }
     if (touches.length !== 2) return;
     event.evt.preventDefault();
     poke();
@@ -185,7 +221,7 @@ const PlayerMap = React.forwardRef(function PlayerMap({ ps, playerId, canMove, p
     const point = { x: (last.centre.x - stageX) / current.scale, y: (last.centre.y - stageY) / current.scale };
     commit(clampView({ z, cx: point.x - (centre.x - size.w / 2) / scale, cy: point.y - (centre.y - size.h / 2) / scale }, size, rect));
   };
-  const onTouchEnd = () => { pinch.current = null; measureUp(); };
+  const onTouchEnd = () => { pinch.current = null; measureUp(); spellUp(); };
 
   const dragBound = useCallback(position => {
     const next = clampView({ z: current.z, cx: (size.w / 2 - position.x) / current.scale, cy: (size.h / 2 - position.y) / current.scale }, size, rect);
@@ -199,6 +235,8 @@ const PlayerMap = React.forwardRef(function PlayerMap({ ps, playerId, canMove, p
 
   const fogOn = ps.showFog && ps.fogCells.length > 0;
   const turnId = ps.combat?.activeId;
+  // A hero or creature at 0 hit points is down (creatures reach players only as a condition word)
+  const downIds = new Set((ps.combat?.entries ?? []).filter(e => e.condition === 'Down' || (e.maxHp > 0 && e.hp <= 0)).map(e => e.tokenId));
   const hpOf = id => {
     const entry = ps.combat?.entries.find(e => e.tokenId === id);
     return entry?.maxHp && entry.hp !== undefined ? { fraction: Math.max(0, Math.min(1, entry.hp / entry.maxHp)) } : null;
@@ -209,16 +247,17 @@ const PlayerMap = React.forwardRef(function PlayerMap({ ps, playerId, canMove, p
     <div ref={wrapRef} className="p-map" aria-label="Battle map">
       {size.w > 0 && (
         <Stage ref={stageRef} width={size.w} height={size.h} x={stageX} y={stageY} scaleX={current.scale} scaleY={current.scale}
-          draggable={tool !== 'measure'} dragBoundFunc={dragBound} dragDistance={4} onDragMove={poke} onDragEnd={onStageDragEnd}
+          draggable={tool !== 'measure' && !spellOn} dragBoundFunc={dragBound} dragDistance={4} onDragMove={poke} onDragEnd={onStageDragEnd}
           onWheel={onWheel} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}
-          onMouseDown={measureDown} onTouchStart={measureDown} onMouseMove={measureMove} onMouseUp={measureUp}
+          onMouseDown={event => { measureDown(event); spellDown(event); }} onTouchStart={event => { measureDown(event); spellDown(event); }}
+          onMouseMove={event => { measureMove(event); spellMove(event); }} onMouseUp={() => { measureUp(); spellUp(); }}
           onClick={onStageTap} onTap={onStageTap}>
           <Layer listening={false} {...clip}>
-            <Rect x={0} y={0} width={ps.mapWidth} height={ps.mapHeight} fill="#0b1024" />
+            <Rect x={0} y={0} width={ps.mapWidth} height={ps.mapHeight} fill={SURFACE_1} />
             {mapImg && <KImg image={moving && mapProxy ? mapProxy : mapImg} x={0} y={0} width={ps.mapWidth} height={ps.mapHeight} />}
           </Layer>
           {ps.showGrid && <Layer listening={false} {...clip}><GridLines gridSize={ps.gridSize} color={ps.gridColor} opacity={ps.gridOpacity} mapW={ps.mapWidth} mapH={ps.mapHeight} /></Layer>}
-          <Layer listening={false} {...clip}>{ps.areaEffects.map(effect => <Group key={effect.id} x={effect.x} y={effect.y} listening={false}><AreaFill effect={effect} /></Group>)}</Layer>
+          <Layer listening={false} {...clip}>{freeEffects(ps.areaEffects).map(effect => <Group key={effect.id} x={effect.x} y={effect.y} listening={false}><AreaFill effect={effect} /></Group>)}</Layer>
           {fogOn && <Layer listening={false} {...clip}><FogCells cells={ps.fogCells} gridSize={ps.gridSize} color={ps.fogColor} opacity={ps.fogOpacity} /></Layer>}
           <Layer key={`m${fonts}`} listening={false} {...clip}>
             {ps.markers.map(marker => <Group key={marker.id} x={marker.x} y={marker.y} listening={false}><MarkerShape marker={marker} /></Group>)}
@@ -228,13 +267,14 @@ const PlayerMap = React.forwardRef(function PlayerMap({ ps, playerId, canMove, p
               const local = pending[token.id];
               const shown = local ? { ...token, x: local.x, y: local.y } : token;
               const mine = !!playerId && token.ownerId === playerId;
-              const draggable = canMove && tool !== 'measure' && canPlayerMoveToken(ps, token, playerId);
+              const draggable = canMove && tool !== 'measure' && !spellOn && canPlayerMoveToken(ps, token, playerId);
               return (
                 <PlayerToken key={token.id} token={shown} gridSize={ps.gridSize} mine={mine} draggable={draggable} snap={ps.snapToGrid}
-                  turn={turnId === token.id} hp={mine ? hpOf(token.id) : null} onMoved={onMoveToken} />
+                  turn={turnId === token.id} hp={mine ? hpOf(token.id) : null} down={downIds.has(token.id)} onMoved={onMoveToken} theme={theme} auras={auras.get(token.id)} />
               );
             })}
             <Pings pings={pings} scale={current.scale} />
+            {spellOn && draft && <SpellGhost spell={spell} draft={draft} />}
             {measure && <MeasureOverlay measure={measure} gridSize={ps.gridSize} feetPerCell={ps.feetPerCell} snapped={ps.snapToGrid} scale={current.scale} />}
           </Layer>
         </Stage>
@@ -246,13 +286,25 @@ const PlayerMap = React.forwardRef(function PlayerMap({ ps, playerId, canMove, p
 // While your own hero is dragged, the others see it move (the server checks you may move it before passing it on).
 const liveSender = createLiveSender(sendPlayerTokenLive);
 
-const PlayerToken = React.memo(function PlayerToken({ token, gridSize, mine, draggable, snap, turn, hp, onMoved }) {
+/** The spell being placed: dashed, in the caster's colour. A square is held by its middle, a circle by its middle, a cone by its tip. */
+function SpellGhost({ spell, draft }) {
+  const shape = { type: spell.type, radius: spell.radius, width: spell.width, height: spell.height, angle: spell.angle, rotation: draft.rotation };
+  const at = spell.type === 'rect' ? { x: draft.x - spell.width / 2, y: draft.y - spell.height / 2 } : { x: draft.x, y: draft.y };
+  return (
+    <Group x={at.x} y={at.y} listening={false}>
+      {areaShape(shape, { fill: `${spell.color}55`, stroke: spell.color, strokeWidth: 2, dash: [8, 5], strokeScaleEnabled: false })}
+    </Group>
+  );
+}
+
+const PlayerToken = React.memo(function PlayerToken({ token, gridSize, mine, draggable, snap, turn, hp, down, onMoved, theme, auras }) {
   const [dragging, setDragging] = useState(false);
   const group = useRef(null);
   const latest = useRef(token);
   latest.current = token;
   const home = useCallback(() => ({ x: latest.current.x, y: latest.current.y }), []);
   useTokenLive(token.id, group, home); // somebody else's hero, or the GM moving one, follows the live feed
+  const half = ((token.gridSize || 1) * gridSize) / 2;
   return (
     <Group ref={group} x={token.x} y={token.y} listening={draggable} draggable={draggable} opacity={dragging ? 0.8 : 1}
       onDragStart={() => setDragging(true)}
@@ -266,7 +318,9 @@ const PlayerToken = React.memo(function PlayerToken({ token, gridSize, mine, dra
       }}
       onMouseEnter={event => { if (draggable) event.target.getStage().container().style.cursor = 'grab'; }}
       onMouseLeave={event => { if (draggable) event.target.getStage().container().style.cursor = 'default'; }}>
-      <TokenArt token={token} gridSize={gridSize} selected={mine && !dragging} dragging={dragging} turn={turn} hp={hp} showName={false} />
+      {/* Circles bound to this hero: inside its group, so they move with it, drags and the live feed included */}
+      {auras?.map(effect => <Group key={effect.id} x={half} y={half} listening={false}><AreaFill effect={effect} /></Group>)}
+      <TokenArt token={token} gridSize={gridSize} selected={mine && !dragging} dragging={dragging} turn={turn} hp={hp} down={down} showName={false} />
     </Group>
   );
 });

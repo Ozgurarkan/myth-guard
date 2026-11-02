@@ -120,7 +120,7 @@ export default function SheetViewer() {
       </div>
 
       <div className="sheet-body">
-        {sheetTabs.length === 0 && <div className="sheet-empty"><Icon name="book-user" size={32} /><p>No sheet open.<br />Add PDFs in the <strong>Sheets</strong> panel, then open each character.</p></div>}
+        {sheetTabs.length === 0 && <div className="sheet-empty"><Icon name="book-user" size={32} /><p>No sheet open</p></div>}
         {sheetTabs.map(tab => urls[tab.id] ? (
           <iframe key={tab.id} title={tab.name} src={`${urls[tab.id]}#view=FitH`} className="sheet-frame" style={{ display: tab.id === activeSheetId ? 'block' : 'none' }} />
         ) : null)}

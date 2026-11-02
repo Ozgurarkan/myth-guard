@@ -6,7 +6,7 @@ import { useStage } from '../stageView';
 import { Icon, Button, IconButton, Avatar, Badge } from '../ui';
 import { useGM, nanoid } from '../store';
 import { useWorkspace } from './workspace';
-import { initiativeOrder } from '../combat';
+import { turnOrder } from '../combat';
 import { areaSizeLabel } from '../utils';
 import { ToolOptions } from './ToolOptions';
 
@@ -19,9 +19,7 @@ function Welcome({ onDismiss }) {
     <div className="welcome-wrap">
       <section className="welcome" aria-labelledby="welcome-title">
         <span className="welcome__seal"><LogoSeal size={112} /></span>
-        <span className="eyebrow">Every adventure begins somewhere</span>
         <h1 id="welcome-title">Set the scene.<br /><em>Tell your story.</em></h1>
-        <p>Bring your world to the table: import a battle map, open a saved scene, or place a few heroes on the grid and see where the night takes them.</p>
         <div className="welcome__actions">
           <label className="btn btn--primary btn--lg">
             <Icon name="upload" size={18} /><span className="btn__label">Import a map</span>
@@ -46,7 +44,7 @@ function CombatChip() {
   const { state, dispatch } = useGM();
   const { openPanel } = useWorkspace();
   const combat = state.combat;
-  const order = initiativeOrder(combat);
+  const order = turnOrder(combat);
   if (!order.length) return null;
   const active = state.tokens.find(token => token.id === combat.activeId);
   return (
@@ -84,6 +82,7 @@ function SelectionBar() {
           <Badge tone={hidden ? 'danger' : 'success'} icon={hidden ? 'eye-off' : 'eye'}>{hidden ? 'Hidden from players' : 'Visible to players'}</Badge></div>
         <div className="selection-bar__actions">
           <Button size="sm" icon={hidden ? 'eye' : 'eye-off'} onClick={() => dispatch({ type: 'TOKEN_TOGGLE_PLAYER_VISIBLE', id })}>{hidden ? 'Reveal' : 'Hide'}</Button>
+          <Button size="sm" icon="skull" variant={token.dead ? 'primary' : 'secondary'} onClick={() => dispatch({ type: 'TOKEN_TOGGLE_DEAD', id })}>{token.dead ? 'Revive' : 'Mark dead'}</Button>
           <IconButton icon="pencil" label="Edit token" size="sm" variant="secondary" onClick={() => dispatch({ type: 'MODAL_TOKEN_SHOW', token })} />
           <IconButton icon="copy" label="Duplicate token" size="sm" variant="secondary"
             onClick={() => dispatch({ type: 'TOKEN_ADD', token: { ...token, id: nanoid(), x: token.x + state.gridSize, y: token.y + state.gridSize } })} />

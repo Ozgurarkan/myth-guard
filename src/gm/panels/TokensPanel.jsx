@@ -81,15 +81,15 @@ export function TokensPanel() {
   return (
     <div>
       <PanelSection title="On the map" count={state.tokens.length} action={<Button size="sm" variant="primary" icon="plus" onClick={() => dispatch({ type: 'MODAL_TOKEN_SHOW', token: null })}>Add token</Button>}>
-        {hiddenCount > 0 && <p className="panel-note"><Badge tone="danger" icon="eye-off">{hiddenCount} hidden</Badge> Players cannot see these until you reveal them.</p>}
+        {hiddenCount > 0 && <p className="panel-note"><Badge tone="danger" icon="eye-off">{hiddenCount} hidden</Badge></p>}
         {state.tokens.length > 6 && <SearchField label="Find a token" placeholder="Find a token…" value={search} onChange={event => setSearch(event.target.value)} />}
-        {state.tokens.length === 0 && <EmptyState icon="users" art="token" title="The table is empty" action={<Button variant="primary" icon="plus" onClick={() => dispatch({ type: 'MODAL_TOKEN_SHOW', token: null })}>Add your first token</Button>}>Heroes, monsters, doors or treasure chests — anything that moves.</EmptyState>}
+        {state.tokens.length === 0 && <EmptyState icon="users" art="token" title="The table is empty" action={<Button variant="primary" icon="plus" onClick={() => dispatch({ type: 'MODAL_TOKEN_SHOW', token: null })}>Add your first token</Button>} />}
         {state.tokens.length > 0 && tokens.length === 0 && <EmptyState icon="search">No token matches “{search}”.</EmptyState>}
         <div className="rows">{tokens.map(token => <TokenRow key={token.id} token={token} />)}</div>
       </PanelSection>
 
       <PanelSection title="Token library" count={presets.length}>
-        {presets.length === 0 && <EmptyState icon="backpack">Tick “Save to token library” when adding a token, or right-click a token on the map, to keep it for later.</EmptyState>}
+        {presets.length === 0 && <EmptyState icon="backpack" title="Token library is empty" />}
         {[['PC', 'Heroes'], ['NPC', 'Creatures & folk']].map(([category, title]) => {
           const group = presets.filter(preset => (preset.category ?? 'NPC') === category);
           if (!group.length) return null;

@@ -73,7 +73,7 @@
 .planner-prose h3 { font-size: 1.35rem; margin-top: 1.2em; }
 .planner-prose > :first-child { margin-top: 0; }
 .planner-prose a { color: var(--accent-2); text-decoration: underline; text-underline-offset: 3px; }
-.planner-prose mark { padding: 0 .15em; border-radius: 3px; background: rgb(255 193 90 / .38); color: var(--text); }
+.planner-prose mark { padding: 0 .15em; border-radius: 3px; background: rgb(var(--warning-rgb) / .38); color: var(--text); }
 .planner-prose ul, .planner-prose ol { padding-left: 1.5em; }
 .planner-prose li { margin: .2em 0; }
 .planner-prose li > p { margin: 0; }

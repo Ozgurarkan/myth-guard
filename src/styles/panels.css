@@ -25,7 +25,7 @@
 .panel-card {
   padding: var(--space-4);
   border: 1px solid var(--border); border-radius: var(--radius-md);
-  background: linear-gradient(180deg, rgb(26 36 71 / .5), rgb(18 26 53 / .55));
+  background: linear-gradient(180deg, rgb(var(--surface-3-rgb) / .5), rgb(var(--surface-2-rgb) / .55));
   box-shadow: var(--highlight-inset);
 }
 .panel-card > :last-child { margin-bottom: 0; }
@@ -74,7 +74,7 @@
 @keyframes panel-breathe { 0%, 100% { opacity: .35; } 50% { opacity: 1; } }
 
 /* ── Scenes ────────────────────────────────────────────────────────────────── */
-.scene-current { padding: var(--space-4) var(--space-4) var(--space-3); border: 1px solid var(--border); border-radius: var(--radius-md); background: linear-gradient(180deg, rgb(26 36 71 / .55), rgb(18 26 53 / .55)); box-shadow: var(--highlight-inset); transition: border-color var(--dur), box-shadow var(--dur); }
+.scene-current { padding: var(--space-4) var(--space-4) var(--space-3); border: 1px solid var(--border); border-radius: var(--radius-md); background: linear-gradient(180deg, rgb(var(--surface-3-rgb) / .55), rgb(var(--surface-2-rgb) / .55)); box-shadow: var(--highlight-inset); transition: border-color var(--dur), box-shadow var(--dur); }
 .scene-current .field { margin-bottom: var(--space-3); }
 .scene-current .button-row { margin: 0; }
 .scene-current.is-dirty { border-color: var(--warning-lo); box-shadow: var(--highlight-inset), inset 3px 0 0 var(--warning); }
@@ -86,7 +86,7 @@
 .scene-card:hover { border-color: var(--accent-lo); transform: translateY(-2px); box-shadow: var(--highlight-inset), var(--shadow-2); }
 .scene-card.is-active { border-color: var(--accent); box-shadow: var(--highlight-inset), var(--glow-accent); }
 .scene-card__art { position: relative; display: block; width: 100%; aspect-ratio: 16 / 10; padding: 0; border: 0; background: var(--surface-sunken); overflow: hidden; }
-.scene-card__art::after { content: ''; position: absolute; inset: auto 0 0 0; height: 40%; background: linear-gradient(180deg, transparent, rgb(5 8 19 / .55)); pointer-events: none; }
+.scene-card__art::after { content: ''; position: absolute; inset: auto 0 0 0; height: 40%; background: linear-gradient(180deg, transparent, rgb(var(--surface-sunken-rgb) / .55)); pointer-events: none; }
 .scene-card__art img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform var(--dur-slow) var(--ease-out), filter var(--dur); filter: saturate(.92); }
 .scene-card:hover .scene-card__art img { transform: scale(1.06); filter: saturate(1.1); }
 .scene-card__art:disabled { cursor: default; }
@@ -151,7 +151,7 @@
 .ping.is-offline { color: var(--text-3); }
 
 /* ── Combat ────────────────────────────────────────────────────────────────── */
-.combat__bar { position: relative; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-3); padding: var(--space-3) var(--space-4); overflow: hidden; border: 1px solid var(--border-strong); border-radius: var(--radius-md); background: linear-gradient(135deg, rgb(106 79 214 / .24), rgb(30 138 163 / .1) 70%), var(--surface-2); box-shadow: var(--highlight-inset), var(--shadow-1); transition: border-color var(--dur), box-shadow var(--dur); }
+.combat__bar { position: relative; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-3); padding: var(--space-3) var(--space-4); overflow: hidden; border: 1px solid var(--border-strong); border-radius: var(--radius-md); background: linear-gradient(135deg, rgb(var(--accent-lo-rgb) / .24), rgb(var(--accent-2-lo-rgb) / .1) 70%), var(--surface-2); box-shadow: var(--highlight-inset), var(--shadow-1); transition: border-color var(--dur), box-shadow var(--dur); }
 .combat__bar::before { content: ''; position: absolute; inset: 0 0 auto; height: 2px; background: var(--rune-line); opacity: .85; }
 .combat__bar.is-running { border-color: var(--accent); box-shadow: var(--highlight-inset), var(--shadow-1), 0 0 22px var(--accent-wash); }
 .combat__round { display: flex; align-items: center; gap: var(--space-3); min-width: 0; }
@@ -181,15 +181,19 @@
 .combatants { display: flex; flex-direction: column; gap: var(--space-3); }
 .combatant { position: relative; display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-3); border: 1px solid var(--border); border-radius: var(--radius-md); background: linear-gradient(180deg, var(--surface-3), var(--surface-2)); box-shadow: var(--highlight-inset), var(--shadow-1); transition: border-color var(--dur), background var(--dur), box-shadow var(--dur); animation: panel-rise var(--dur) var(--ease-out) both; }
 /* Active turn: a solid left bar + a breathing arcane halo + a "Turn" badge (three cues, not just colour) */
-.combatant.is-active { border-color: var(--accent); background: linear-gradient(180deg, rgb(165 139 255 / .22), var(--surface-2) 75%); box-shadow: var(--highlight-inset), inset 4px 0 0 var(--accent), 0 0 0 1px var(--accent-lo); }
+.combatant.is-active { border-color: var(--accent); background: linear-gradient(180deg, rgb(var(--accent-rgb) / .22), var(--surface-2) 75%); box-shadow: var(--highlight-inset), inset 4px 0 0 var(--accent), 0 0 0 1px var(--accent-lo); }
 .combatant.is-active::after { content: ''; position: absolute; inset: -1px; border-radius: inherit; box-shadow: 0 0 26px var(--accent-glow); pointer-events: none; animation: panel-breathe 2.8s ease-in-out infinite; }
-.combatant.is-down { border-style: dashed; border-color: var(--danger-lo); }
-.combatant.is-down .combatant__avatar .avatar { filter: grayscale(.8) brightness(.8); }
+.combatant.is-down { border-style: dashed; border-color: var(--danger); box-shadow: inset 0 0 18px var(--danger-wash); }
+.combatant.is-down .combatant__avatar .avatar { box-shadow: 0 0 0 2px var(--danger), 0 0 12px var(--danger-glow, var(--danger)); }
+.combatant.is-dead { border-style: dashed; border-color: var(--border-strong); }
+.combatant.is-dead .combatant__avatar .avatar { filter: grayscale(1) brightness(.7); }
+.combatant.is-dead .row__title { color: var(--text-3); }
 .combatant__head { display: flex; align-items: center; gap: var(--space-2); }
 .combatant__rank { position: absolute; left: -7px; top: -7px; display: grid; place-items: center; min-width: 20px; height: 20px; padding: 0 4px; border: 1px solid var(--border-strong); border-radius: var(--radius-xs); background: var(--surface-sunken); font: var(--fw-bold) 11px/1 var(--font-body); color: var(--text-2); }
 .combatant.is-active .combatant__rank { border-color: var(--accent-hi); background: var(--accent); color: var(--text-on-accent); }
 .combatant__avatar { position: relative; flex: none; display: inline-flex; }
-.combatant__skull { position: absolute; inset: 0; margin: auto; color: var(--text); filter: drop-shadow(0 1px 3px rgb(0 0 0 / .8)); }
+.combatant__skull { position: absolute; inset: 0; margin: auto; color: var(--text); filter: drop-shadow(0 1px 3px rgb(var(--shadow-rgb) / .8)); }
+img.combatant__skull { width: 26px; height: 26px; object-fit: contain; }
 .combatant__tags { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 3px; }
 .combatant__turn { flex: none; }
 .combatant__hp { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: var(--space-2); }
@@ -221,14 +225,14 @@
 @media (pointer: coarse) { .numfield .input, .numfield__plain, .combat__amount .input { min-height: var(--tap-min); } }
 
 /* Hit-point bar. Severity changes the fill PATTERN as well as its hue: solid > light stripes > dense stripes > hatched empty. */
-.healthbar { position: relative; height: 26px; border: 1px solid var(--border-strong); border-radius: 99px; background: var(--surface-sunken); overflow: hidden; box-shadow: inset 0 2px 5px rgb(0 0 0 / .6); }
+.healthbar { position: relative; height: 26px; border: 1px solid var(--border-strong); border-radius: 99px; background: var(--surface-sunken); overflow: hidden; box-shadow: inset 0 2px 5px rgb(var(--shadow-rgb) / .6); }
 .healthbar__fill { position: absolute; inset: 0 auto 0 0; border-radius: 99px; transition: width var(--dur-slow) var(--ease-out); }
 .healthbar.is-good .healthbar__fill { background: linear-gradient(90deg, var(--success-lo), var(--success)); }
-.healthbar.is-warn .healthbar__fill { background: repeating-linear-gradient(135deg, rgb(0 0 0 / .16) 0 3px, transparent 3px 12px), linear-gradient(90deg, var(--warning-lo), var(--warning)); }
-.healthbar.is-bad .healthbar__fill { background: repeating-linear-gradient(135deg, rgb(0 0 0 / .3) 0 5px, transparent 5px 10px), linear-gradient(90deg, var(--danger-lo), var(--danger)); }
-.healthbar.is-down { border-color: var(--danger-lo); background: repeating-linear-gradient(135deg, rgb(255 111 142 / .16) 0 6px, transparent 6px 12px), var(--surface-sunken); }
-.healthbar__ticks { position: absolute; inset: 0; pointer-events: none; background: linear-gradient(90deg, transparent calc(25% - 1px), rgb(238 242 255 / .22) calc(25% - 1px) 25%, transparent 25% calc(50% - 1px), rgb(238 242 255 / .22) calc(50% - 1px) 50%, transparent 50%); }
-.healthbar__text { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); padding: 0 10px; border-radius: 99px; background: rgb(5 8 19 / .8); color: var(--text); font: var(--fw-bold) 12.5px/18px var(--font-body); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.healthbar.is-warn .healthbar__fill { background: repeating-linear-gradient(135deg, rgb(var(--shadow-rgb) / .16) 0 3px, transparent 3px 12px), linear-gradient(90deg, var(--warning-lo), var(--warning)); }
+.healthbar.is-bad .healthbar__fill { background: repeating-linear-gradient(135deg, rgb(var(--shadow-rgb) / .3) 0 5px, transparent 5px 10px), linear-gradient(90deg, var(--danger-lo), var(--danger)); }
+.healthbar.is-down { border-color: var(--danger-lo); background: repeating-linear-gradient(135deg, rgb(var(--danger-rgb) / .16) 0 6px, transparent 6px 12px), var(--surface-sunken); }
+.healthbar__ticks { position: absolute; inset: 0; pointer-events: none; background: linear-gradient(90deg, transparent calc(25% - 1px), rgb(var(--text-rgb) / .22) calc(25% - 1px) 25%, transparent 25% calc(50% - 1px), rgb(var(--text-rgb) / .22) calc(50% - 1px) 50%, transparent 50%); }
+.healthbar__text { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); padding: 0 10px; border-radius: 99px; background: rgb(var(--surface-sunken-rgb) / .8); color: var(--text); font: var(--fw-bold) 12.5px/18px var(--font-body); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .healthbar.is-unset { display: grid; place-items: center; border-style: dashed; background: var(--surface-sunken); }
 .healthbar.is-unset span { color: var(--text-3); font: var(--fw-medium) var(--fs-xs) var(--font-body); }
 
@@ -320,7 +324,7 @@
 
 /* ── Add-token form & image cropper (used by modals) ───────────────────────── */
 .token-art { display: flex; align-items: center; gap: var(--space-4); }
-.token-art__preview { flex: none; display: grid; place-items: center; width: 92px; height: 92px; border-radius: 50%; overflow: hidden; background: var(--surface-sunken); border: 4px solid var(--ring, var(--accent)); box-shadow: 0 0 18px color-mix(in srgb, var(--ring, var(--accent)) 40%, transparent), inset 0 0 12px rgb(0 0 0 / .6); }
+.token-art__preview { flex: none; display: grid; place-items: center; width: 92px; height: 92px; border-radius: 50%; overflow: hidden; background: var(--surface-sunken); border: 4px solid var(--ring, var(--accent)); box-shadow: 0 0 18px color-mix(in srgb, var(--ring, var(--accent)) 40%, transparent), inset 0 0 12px rgb(var(--shadow-rgb) / .6); }
 .token-art__preview img { width: 100%; height: 100%; object-fit: cover; }
 .token-art__preview .avatar { border: 0; box-shadow: none; background: transparent; }
 .token-art__actions { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; min-width: 0; }

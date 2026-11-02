@@ -24,11 +24,13 @@ const assign = (target, source, keys) => {
   return target;
 };
 
-const TOKEN_FIELDS = ['id', 'x', 'y', 'gridSize', 'name', 'color', 'borderWidth', 'imageSrc', 'showNumber', 'number', 'ownerId'];
+// The number badge (showNumber / number: Goblin #1, #2, #3) is for the GM's own screen: players are never sent it, so it cannot be shown.
+const TOKEN_FIELDS = ['id', 'x', 'y', 'gridSize', 'name', 'color', 'borderWidth', 'imageSrc', 'ownerId', 'dead'];
 const MARKER_FIELDS = ['id', 'type', 'x', 'y', 'size', 'color', 'label', 'filled', 'opacity'];
 // A spell area is a circle, a rectangle or a cone (see areaShape / AreaFill in canvas/shared.jsx). Anything else on it,
 // now or added later, stays with the GM until it is listed here.
-const AREA_FIELDS = ['id', 'type', 'x', 'y', 'color', 'opacity', 'radius', 'width', 'height', 'angle', 'rotation'];
+// `ownerId` lets a player find the ones they cast; `boundTo` is the token a bound circle follows.
+const AREA_FIELDS = ['id', 'type', 'x', 'y', 'color', 'opacity', 'radius', 'width', 'height', 'angle', 'rotation', 'ownerId', 'boundTo'];
 const VIEW_RECT_FIELDS = ['x', 'y', 'width', 'height'];
 const isObject = value => value !== null && typeof value === 'object' && !Array.isArray(value);
 
@@ -50,6 +52,8 @@ export function projectForPlayers(scene) {
       return out;
     });
 
+  const visibleIds = new Set(visibleTokens.map(token => token.id));
+
   return {
     mapImageSrc: scene.mapImageSrc ?? null,
     mapWidth: scene.mapWidth,
@@ -61,11 +65,14 @@ export function projectForPlayers(scene) {
     feetPerCell: scene.feetPerCell,
     snapToGrid: scene.snapToGrid !== false,
     playerCanMoveTokens: scene.playerCanMoveTokens !== false,
+    playerCanEditCombat: scene.playerCanEditCombat !== false,
+    playerCanCast: scene.playerCanCast !== false,
     showFog: fogOn,
     fogCells,
     fogColor: scene.fogColor,
     fogOpacity: scene.fogOpacity,
-    areaEffects: (Array.isArray(scene.areaEffects) ? scene.areaEffects : []).filter(isObject).map(effect => assign({}, effect, AREA_FIELDS)),
+    // a circle bound to a token the table cannot see is not sent either: it would show where that token is
+    areaEffects: (Array.isArray(scene.areaEffects) ? scene.areaEffects : []).filter(isObject).filter(effect => !effect.boundTo || visibleIds.has(effect.boundTo)).map(effect => assign({}, effect, AREA_FIELDS)),
     markers: (scene.markers ?? []).filter(marker => marker.visibleToPlayers).map(marker => assign({}, marker, MARKER_FIELDS)),
     playerViewRect: isObject(scene.playerViewRect) ? assign({}, scene.playerViewRect, VIEW_RECT_FIELDS) : undefined,
     tokens: visibleTokens,

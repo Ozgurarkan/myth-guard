@@ -33,7 +33,6 @@ function FogOptions() {
       <Button size="sm" icon="cloud-fog" onClick={cover}>Cover all</Button>
       <Button size="sm" icon="sun" onClick={() => { dispatch({ type: 'FOG_CLEAR' }); toast('The fog has lifted.'); }}>Clear all</Button>
     </span>
-    <span className="tool-options__hint">Click and drag across the map</span>
   </>;
 }
 
@@ -72,7 +71,6 @@ function MarkerOptions() {
       options={MARKER_TYPES.map(type => ({ value: type.value, label: type.icon, title: type.label }))} />
     <Swatches colors={MARKER_COLORS} value={state.activeMarkerColor} onChange={color => prop('activeMarkerColor', color)} label="Marker colour" />
     <Input className="tool-options__text" placeholder="Label (optional)" aria-label="Marker label" value={state.activeMarkerLabel} onChange={event => prop('activeMarkerLabel', event.target.value)} />
-    <span className="tool-options__hint">Click the map to place</span>
   </>;
 }
 

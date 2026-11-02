@@ -11,14 +11,17 @@ import { usePings } from '../pings';
 import { useTokenLive, createLiveSender } from '../liveTokens';
 import { sendGmTokenLive } from '../broadcast';
 import { getStage, setStage, useStage } from '../stageView';
-import { GridLines, FogCells, TokenArt, MarkerShape, AreaFill, Pings, useMapProxy, useInteracting, areaShape, useFontsVersion, FONT_BODY, CYAN, CYAN_HI, SURFACE_1, INK, INK_STROKE } from './shared';
+import { GridLines, FogCells, TokenArt, MarkerShape, AreaFill, Pings, useMapProxy, useInteracting, areaShape, useFontsVersion, FONT_BODY, CYAN, CYAN_HI, CYAN_WASH, SURFACE_1, INK, INK_STROKE, FRAME_FILL, FRAME_STROKE, MAP_FILL } from './shared';
+import { useThemeVersion } from '../theme';
+import { aurasByToken, freeEffects } from '../areas';
 
 // ── Tokens ────────────────────────────────────────────────────────────────────
 // While a token is dragged its position is passed to the players as it moves (the server drops it for hidden or fogged tokens).
 const liveSender = createLiveSender(sendGmTokenLive);
 
-function TokenItem({ token, selected, turn, hp, onSelect, onMove, onContextMenu, snap, gridSize }) {
+function TokenItem({ token, selected, turn, hp, onSelect, onMove, onContextMenu, snap, gridSize, auras }) {
   const hidden = token.visibleToPlayers === false;
+  const half = ((token.gridSize || 1) * gridSize) / 2;
   const [dragging, setDragging] = useState(false);
   const group = useRef(null);
   const latest = useRef(token);
@@ -43,6 +46,8 @@ function TokenItem({ token, selected, turn, hp, onSelect, onMove, onContextMenu,
         onMove(token.id, x, y);
       }}
     >
+      {/* Circles a player bound to this hero: drawn inside the token's group, so they go wherever it goes, drags included */}
+      {auras?.map(effect => <Group key={effect.id} x={half} y={half} listening={false}><AreaFill effect={effect} /></Group>)}
       <TokenArt token={token} gridSize={gridSize} selected={selected} turn={turn} hp={hp} dragging={dragging} ghost={hidden} />
     </Group>
   );
@@ -138,7 +143,7 @@ function PlayerViewOverlay({ rect, onUpdate }) {
   const resize = event => onUpdate({ x: rect.x, y: rect.y, width: Math.max(100, event.target.x() + 9 - rect.x), height: Math.max(80, event.target.y() + 9 - rect.y) });
   return (
     <Layer>
-      <Rect x={rect.x} y={rect.y} width={rect.width} height={rect.height} stroke={CYAN} strokeWidth={2.5} strokeScaleEnabled={false} dash={[14, 7]} fill="rgba(79,216,238,.06)"
+      <Rect x={rect.x} y={rect.y} width={rect.width} height={rect.height} stroke={CYAN} strokeWidth={2.5} strokeScaleEnabled={false} dash={[14, 7]} fill={CYAN_WASH}
         draggable onDragEnd={event => onUpdate({ ...rect, x: event.target.x(), y: event.target.y() })} />
       <Text x={rect.x + 8} y={rect.y + 8} text="WHAT THE PLAYERS SEE" fontSize={11} letterSpacing={2} fontFamily={FONT_BODY} fontStyle="bold" fill={CYAN_HI}
         stroke={INK_STROKE} strokeWidth={3} fillAfterStrokeEnabled listening={false} />
@@ -150,13 +155,13 @@ function PlayerViewOverlay({ rect, onUpdate }) {
 
 // ── Stage ─────────────────────────────────────────────────────────────────────
 /** The map picture, on its own layer. Draws the lighter copy while the view is moving (see useMapProxy). */
-const MapPicture = React.memo(function MapPicture({ frame, mapImage, mapProxy, moving, mapWidth, mapHeight }) {
+const MapPicture = React.memo(function MapPicture({ frame, mapImage, mapProxy, moving, mapWidth, mapHeight, theme }) {
   return (
     <Layer listening={false}>
-      <Rect {...frame} fill="#03050d" stroke="#4458a0" strokeWidth={2} strokeScaleEnabled={false} />
+      <Rect {...frame} fill={FRAME_FILL} stroke={FRAME_STROKE} strokeWidth={2} strokeScaleEnabled={false} />
       {mapImage
         ? <KImg image={moving && mapProxy ? mapProxy : mapImage} x={0} y={0} width={mapWidth} height={mapHeight} />
-        : <Rect x={0} y={0} width={mapWidth} height={mapHeight} fill="#0e1430" />}
+        : <Rect x={0} y={0} width={mapWidth} height={mapHeight} fill={MAP_FILL} />}
     </Layer>
   );
 });
@@ -165,9 +170,10 @@ const MapPicture = React.memo(function MapPicture({ frame, mapImage, mapProxy, m
  * Everything drawn on the map: grid, spell areas, fog, markers, tokens, pings. Memoised on purpose. Panning and zooming change
  * only the stage's position, so none of these props change and React skips every one of these shapes on each step.
  */
-const SceneLayers = React.memo(function SceneLayers({ state, dispatch, select, menu, fonts, tempArea, ghost, exactMode, turnId, pings, moving }) {
+const SceneLayers = React.memo(function SceneLayers({ state, dispatch, select, menu, fonts, theme, tempArea, ghost, exactMode, turnId, pings, moving }) {
   // While the view is moving nobody is clicking tokens, so Konva skips redrawing its hidden click-detection copy of every shape.
   const interactive = !moving;
+  const auras = aurasByToken(state.areaEffects);
   const hpOf = id => {
     const entry = state.combat.entries.find(e => e.tokenId === id);
     return entry?.maxHp ? { fraction: Math.max(0, Math.min(1, entry.hp / entry.maxHp)) } : null;
@@ -179,7 +185,7 @@ const SceneLayers = React.memo(function SceneLayers({ state, dispatch, select, m
 
       {/* 3. Spell areas */}
       <Layer key={`areas-${fonts}`} listening={interactive}>
-        {state.areaEffects.map(effect => (
+        {freeEffects(state.areaEffects).map(effect => (
           <AreaItem key={effect.id} effect={effect} selected={state.selectedId === effect.id} onSelect={select}
             onMove={(id, x, y) => dispatch({ type: 'AREA_MOVE', id, x, y })} onContextMenu={menu} gridSize={state.gridSize} feetPerCell={state.feetPerCell} />
         ))}
@@ -205,7 +211,7 @@ const SceneLayers = React.memo(function SceneLayers({ state, dispatch, select, m
         {state.tokens.map(token => (
           <TokenItem key={token.id} token={token} selected={state.selectedId === token.id} turn={turnId === token.id} hp={hpOf(token.id)}
             onSelect={select} onMove={(id, x, y) => dispatch({ type: 'TOKEN_MOVE', id, x, y })} onContextMenu={menu}
-            snap={state.snapToGrid} gridSize={state.gridSize} />
+            snap={state.snapToGrid} gridSize={state.gridSize} auras={auras.get(token.id)} />
         ))}
         {/* Pings from the players: a short ripple where they pointed */}
         <Pings pings={pings} />
@@ -245,6 +251,7 @@ export default function MapStage({ containerRef }) {
   const [tempArea, setTempArea] = useState(null);
   const [ghost, setGhost] = useState(null);
   const fonts = useFontsVersion();
+  const theme = useThemeVersion();   // the memoised layers below repaint in the new colours
   const pings = usePings();
 
   const isPanning = useRef(false);
@@ -461,8 +468,8 @@ export default function MapStage({ containerRef }) {
       onClick={() => { if (state.contextMenu) dispatch({ type: 'CONTEXT_MENU_HIDE' }); }}
       style={{ cursor, display: 'block' }}
     >
-      <MapPicture frame={frame} mapImage={mapImage} mapProxy={mapProxy} moving={moving} mapWidth={state.mapWidth} mapHeight={state.mapHeight} />
-      <SceneLayers state={state} dispatch={dispatch} select={select} menu={menu} fonts={fonts} tempArea={tempArea} ghost={ghost} exactMode={exactMode} turnId={turnId} pings={pings} moving={moving} />
+      <MapPicture frame={frame} mapImage={mapImage} mapProxy={mapProxy} moving={moving} mapWidth={state.mapWidth} mapHeight={state.mapHeight} theme={theme} />
+      <SceneLayers state={state} dispatch={dispatch} select={select} menu={menu} fonts={fonts} theme={theme} tempArea={tempArea} ghost={ghost} exactMode={exactMode} turnId={turnId} pings={pings} moving={moving} />
 
       {/* 7. Player view frame (GM only) */}
       {state.playerViewEnabled && <PlayerViewOverlay rect={state.playerViewRect} onUpdate={rect => dispatch({ type: 'PV_SET_RECT', rect })} />}

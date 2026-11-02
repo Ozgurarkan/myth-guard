@@ -93,7 +93,7 @@ export const CODE_LENGTH = 8;
 /** Player -> server. Anything else from a player is a protocol violation (strike). */
 export const PLAYER_TYPES = frozenSet([
   'PING', 'RESUME', 'RESYNC', 'REQUEST_FULL_STATE', 'PLAYER_NAME', 'PLAYER_TOKEN_MOVE', 'PLAYER_PING',
-  'PLAYER_TOKEN_LIVE', 'PLAYER_END_TURN', 'AUDIO_LISTEN', 'AUDIO_ANSWER', 'AUDIO_STATS',
+  'PLAYER_TOKEN_LIVE', 'PLAYER_COMBAT_EDIT', 'PLAYER_DELAY_TURN', 'PLAYER_END_TURN', 'PLAYER_AREA_ADD', 'PLAYER_AREA_REMOVE', 'AUDIO_LISTEN', 'AUDIO_ANSWER', 'AUDIO_STATS',
 ]);
 
 /** GM -> server. */
@@ -112,7 +112,7 @@ export const SERVER_TO_PLAYER = frozenSet([
 /** Server -> GM. */
 export const SERVER_TO_GM = frozenSet([
   'HELLO', 'PONG', 'REQUEST_FULL_STATE', 'PLAYER_ROSTER', 'JOIN_REQUEST', 'TABLE', 'PLAYER_TOKEN_MOVE',
-  'PLAYER_END_TURN', 'MAP_PING', 'TOKEN_LIVE', 'AUDIO_LISTENER', 'AUDIO_ANSWER', 'AUDIO_STATS',
+  'PLAYER_END_TURN', 'PLAYER_COMBAT_EDIT', 'PLAYER_DELAY_TURN', 'PLAYER_AREA_ADD', 'PLAYER_AREA_REMOVE', 'MAP_PING', 'TOKEN_LIVE', 'AUDIO_LISTENER', 'AUDIO_ANSWER', 'AUDIO_STATS',
 ]);
 
 const KiB = 1024;
@@ -137,6 +137,10 @@ export const TYPE_CAPS = deepFreeze({
   PLAYER_TOKEN_MOVE: cap(192, 40, 30),           // also server -> GM
   PLAYER_PING: cap(128, 2, 1.5),                 // the 700 ms cooldown itself is a rule in actions.js; this is the flood bucket
   PLAYER_TOKEN_LIVE: cap(128, 20, 40),           // a token being dragged, about 25 times a second; never stored (see liveMove in actions.js)
+  PLAYER_COMBAT_EDIT: cap(192, 8, 4),            // a hero's hit points or initiative; also server -> GM
+  PLAYER_DELAY_TURN: cap(192, 3, 1),             // "I wait until after ..."; once per hero per round, also server -> GM
+  PLAYER_AREA_ADD: cap(320, 4, 1.5),             // a spell area or a bound circle; also server -> GM
+  PLAYER_AREA_REMOVE: cap(160, 6, 2),            // take back one of your own, or all of them; also server -> GM
   PLAYER_END_TURN: cap(160, 3, 1),               // duplicates within 1.5 s are ignored by actions.js; also server -> GM
   AUDIO_LISTEN: cap(256, 2, 1),
   AUDIO_ANSWER: cap(12 * KiB, 3, 3),             // also server -> GM

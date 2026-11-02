@@ -17,11 +17,6 @@ const MODES = [
   { value: 'ask', label: 'Ask first', icon: 'hand', title: 'You approve each new device' },
   { value: 'locked', label: 'Locked', icon: 'lock', title: 'No new devices; players already here can reconnect' },
 ];
-const MODE_TEXT = {
-  open: 'Anyone with the QR code or the table code joins at once, up to 16 devices.',
-  ask: 'Each new device waits until you press Admit. Players already at the table reconnect freely.',
-  locked: 'No new devices can join. Players already at the table can still reconnect. The table code changes.',
-};
 
 function Quality({ rtt, loss }) {
   if (rtt == null) return null;
@@ -120,7 +115,6 @@ export function SessionDialog({ onClose }) {
   const onlineCount = people.filter(player => player.online && player.admitted).length;
   const pendingCount = people.filter(player => !player.admitted).length;
   const sorted = [...people].sort((a, b) => Number(a.admitted) - Number(b.admitted));
-  const notLocal = !['localhost', '127.0.0.1', '[::1]'].includes(window.location.hostname);
 
   const flash = what => {
     setCopied(what);
@@ -169,7 +163,6 @@ export function SessionDialog({ onClose }) {
                 <Button size="sm" icon={copied === 'link' ? 'check' : 'link'} onClick={() => copy(joinUrl, 'link', 'Invite link copied. Send it only to your players.')}>{copied === 'link' ? 'Copied' : 'Copy invite link'}</Button>
                 <Button size="sm" variant="ghost" icon="refresh-cw" onClick={rotate}>New invite</Button>
               </div>
-              <p className="session__note">No code is needed: players on your Wi-Fi can simply open the address above. If you would rather keep the table private, turn on “Players need the QR code or table code” in the Table tab, or set the mode below to ask first. Never show the QR code to the internet.</p>
               {addresses.length > 1 && (
                 <label className="session__alt">
                   <span>Not working? Try another network:</span>
@@ -184,32 +177,17 @@ export function SessionDialog({ onClose }) {
         <section>
           <h3 className="session__heading"><Icon name="lock" size={16} /> Who may join</h3>
           <Segmented label="Who may join" value={mode} options={MODES} onChange={setMode} />
-          <p className="session__hint session__mode-text" role="status">{MODE_TEXT[mode]}</p>
-          {info && !info.persist && <p className="session__note">This table is not being saved to disk, so players must be invited again after a restart.</p>}
         </section>
 
         <section>
           <h3 className="session__heading"><Icon name="users" size={16} /> At the table
             {pendingCount > 0 && <Badge tone="warning">{pendingCount} waiting</Badge>}
             <Badge tone={onlineCount ? 'success' : 'neutral'}>{onlineCount} online</Badge></h3>
-          {people.length === 0 && <p className="session__hint">Nobody has joined yet. Players open the address (or scan the code), enter their name, and appear here.</p>}
           <div className="rows">
             {sorted.map(player => <DeviceRow key={player.deviceId ?? player.id} player={player} />)}
           </div>
         </section>
 
-        <details className="session__help">
-          <summary>Players can’t connect?</summary>
-          <ul>
-            <li>Everyone must be on the <strong>same Wi-Fi</strong>. Guest networks often block devices from talking to each other.</li>
-            <li>The typed <strong>table code</strong> works only while this window is open (and for 10 minutes after). The QR code always works until you create a new invite.</li>
-            <li><strong>Wrong code?</strong> Codes have no O, I, L, 0 or 1. Five wrong tries from one phone pause it for a few minutes; if someone keeps guessing, the table locks itself.</li>
-            <li><strong>Table locked?</strong> Press Open or Ask first above. Phones that already joined can still reconnect while it is locked.</li>
-            <li>A phone in private browsing, or one that cleared its site data, counts as a new device and needs the QR code or table code again.</li>
-            <li>If Windows asks, allow <strong>Node.js</strong> through the firewall on <strong>Private networks</strong>. Still stuck? Run <code>ENABLE-LAN.ps1</code> once as administrator.</li>
-            <li>Keep this computer awake while you play.{notLocal && <> To share PC sound, open this screen from <code>http://localhost</code> on the GM computer.</>}</li>
-          </ul>
-        </details>
       </div>
     </Modal>
   );
